@@ -56,7 +56,7 @@ impl<F: FindAuthor<u32>> FindAuthor<H160> for EthereumFindAuthor<F> {
 		None
 	}
 }
-const MIN_GAS_PRICE: u64 = 1_873_548_000_299;
+const MIN_GAS_PRICE: u64 = 238_095_238_096;
 pub struct FeeCalculator<T>(PhantomData<T>);
 impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 	fn min_gas_price() -> (U256, Weight) {
