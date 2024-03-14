@@ -165,7 +165,7 @@ pub fn native_version() -> NativeVersion {
 
 parameter_types! {
 	pub const Version: RuntimeVersion = VERSION;
-	pub const SS58Prefix: u16 = 42;
+	pub const SS58Prefix: u16 = 12994;
 	// TODO
 	pub const ChainId: u64 = 0xBABB;
 }
