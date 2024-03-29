@@ -1,0 +1,40 @@
+[package]
+edition = "2021"
+license = "GPLv3"
+name = "pallet-balances-adapter"
+version = "0.1.0"
+
+[dependencies]
+# Substrate
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+pallet-balances = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+
+#Parity
+parity-scale-codec = { workspace = true }
+scale-info = { workspace = true }
+
+# Unique
+evm-coder = { workspace = true }
+pallet-evm = { workspace = true }
+
+#Local
+pallet-evm-coder-substrate = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+	"evm-coder/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-balances/std",
+	"pallet-evm-coder-substrate/std",
+	"pallet-evm/std",
+	"sp-core/std",
+	"sp-std/std",
+]
+stubgen = ["evm-coder/stubgen"]
+try-runtime = ["frame-support/try-runtime"]

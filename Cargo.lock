@@ -4545,6 +4545,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-balances-adapter"
+version = "0.1.0"
+dependencies = [
+ "evm-coder",
+ "frame-support",
+ "frame-system",
+ "pallet-balances",
+ "pallet-evm",
+ "pallet-evm-coder-substrate",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-beefy"
 version = "25.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
