@@ -1700,24 +1700,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ethereum"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e04d24d20b8ff2235cffbf242d5092de3aa45f77c5270ddbfadd2778ca13fea"
-dependencies = [
- "bytes",
- "ethereum-types",
- "hash-db 0.16.0",
- "hash256-std-hasher",
- "parity-scale-codec",
- "rlp",
- "scale-info",
- "serde",
- "sha3",
- "trie-root",
-]
-
-[[package]]
 name = "ethereum-types"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1767,7 +1749,7 @@ source = "git+https://github.com/rust-blockchain/evm?rev=b7b82c7e1fc57b7449d6dfa
 dependencies = [
  "auto_impl",
  "environmental",
- "ethereum 0.14.0",
+ "ethereum",
  "evm-core",
  "evm-gasometer",
  "evm-runtime",
@@ -1782,11 +1764,11 @@ dependencies = [
 
 [[package]]
 name = "evm-coder"
-version = "0.4.3"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51a19d57bff1055ffd8f4d542975e7d06c86463df8e4af3d6a1680d1930f7eea"
+checksum = "b88ae5a449e7e9dfef59c0dd2df396bc56d81a6f4e297490c0c64aa73f7f7ad4"
 dependencies = [
- "ethereum 0.15.0",
+ "ethereum",
  "evm-coder-procedural",
  "impl-trait-for-tuples",
  "primitive-types",
@@ -2012,7 +1994,7 @@ name = "fp-consensus"
 version = "2.0.0-dev"
 source = "git+https://github.com/uniquenetwork/unique-frontier?branch=unique-polkadot-v1.3.0#2b684850edc955bcd3c3943216e451364ff0afa3"
 dependencies = [
- "ethereum 0.14.0",
+ "ethereum",
  "parity-scale-codec",
  "sp-core",
  "sp-runtime",
@@ -2024,7 +2006,7 @@ name = "fp-ethereum"
 version = "1.0.0-dev"
 source = "git+https://github.com/uniquenetwork/unique-frontier?branch=unique-polkadot-v1.3.0#2b684850edc955bcd3c3943216e451364ff0afa3"
 dependencies = [
- "ethereum 0.14.0",
+ "ethereum",
  "ethereum-types",
  "fp-evm",
  "frame-support",
@@ -2053,7 +2035,7 @@ name = "fp-rpc"
 version = "3.0.0-dev"
 source = "git+https://github.com/uniquenetwork/unique-frontier?branch=unique-polkadot-v1.3.0#2b684850edc955bcd3c3943216e451364ff0afa3"
 dependencies = [
- "ethereum 0.14.0",
+ "ethereum",
  "ethereum-types",
  "fp-evm",
  "parity-scale-codec",
@@ -4766,7 +4748,7 @@ name = "pallet-ethereum"
 version = "4.0.0-dev"
 source = "git+https://github.com/uniquenetwork/unique-frontier?branch=unique-polkadot-v1.3.0#2b684850edc955bcd3c3943216e451364ff0afa3"
 dependencies = [
- "ethereum 0.14.0",
+ "ethereum",
  "ethereum-types",
  "evm",
  "fp-consensus",

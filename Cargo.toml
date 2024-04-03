@@ -145,7 +145,7 @@ fp-self-contained = { default-features = false, features = [
 ], git = "https://github.com/uniquenetwork/unique-frontier", branch = "unique-polkadot-v1.3.0" }
 
 # EVM
-evm-coder = { version = "0.4.2", default-features = false, features = [
+evm-coder = { version = "=0.4.2", default-features = false, features = [
 	'bondrewd',
 ] }
 evm-core = { git = "https://github.com/rust-blockchain/evm", rev = "b7b82c7e1fc57b7449d6dfa6826600de37cc1e65", default-features = false }

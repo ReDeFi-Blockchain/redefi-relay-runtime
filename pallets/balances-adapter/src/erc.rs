@@ -1,17 +1,36 @@
-use evm_coder::{abi::AbiType, generate_stubgen, solidity_interface, types::*};
+use evm_coder::{abi::AbiType, generate_stubgen, solidity_interface};
 use pallet_balances::WeightInfo;
 use pallet_evm_coder_substrate::{
-	call, dispatch_to_evm,
+	dispatch_to_evm,
 	execution::{PreDispatch, Result},
-	frontier_contract, WithRecorder,
+	frontier_contract,
 };
 use sp_core::{Get, U256};
 
+use super::*;
 use crate::{Config, NativeFungibleHandle, Pallet, SelfWeightOf};
 
 frontier_contract! {
 	macro_rules! NativeFungibleHandle_result {...}
 	impl<T: Config> Contract for NativeFungibleHandle<T> {...}
+}
+
+#[derive(ToLog)]
+pub enum ERC20Events {
+	Transfer {
+		#[indexed]
+		from: Address,
+		#[indexed]
+		to: Address,
+		value: U256,
+	},
+	Approval {
+		#[indexed]
+		owner: Address,
+		#[indexed]
+		spender: Address,
+		value: U256,
+	},
 }
 
 #[solidity_interface(name = ERC20, enum(derive(PreDispatch)), enum_attr(weight), expect_selector = 0x942e8b22)]
@@ -20,8 +39,13 @@ impl<T: Config> NativeFungibleHandle<T> {
 		Ok(U256::zero())
 	}
 
-	fn approve(&mut self, _caller: Caller, _spender: Address, _amount: U256) -> Result<bool> {
-		Err("approve not supported".into())
+	fn approve(&mut self, caller: Caller, spender: Address, amount: U256) -> Result<bool> {
+		self.consume_store_writes(1)?;
+		let owner = T::CrossAccountId::from_eth(caller);
+		let spender = T::CrossAccountId::from_eth(spender);
+		let amount = amount.try_into().map_err(|_| "amount overflow")?;
+		<Pallet<T>>::allowance_internal(&owner, &spender, amount, true);
+		Ok(true)
 	}
 
 	fn balance_of(&self, owner: Address) -> Result<U256> {
@@ -54,11 +78,11 @@ impl<T: Config> NativeFungibleHandle<T> {
 		let to = T::CrossAccountId::from_eth(to);
 		let amount = amount.try_into().map_err(|_| "amount overflow")?;
 
-		<Pallet<T>>::transfer(&caller, &to, amount).map_err(|e| dispatch_to_evm::<T>(e.error))?;
+		<Pallet<T>>::transfer(&caller, &to, amount).map_err(dispatch_to_evm::<T>)?;
 		Ok(true)
 	}
 
-	#[weight(<SelfWeightOf<T>>::transfer_allow_death())]
+	#[weight(<SelfWeightOf<T>>::transfer_allow_death() + T::DbWeight::get().writes(1_u64))]
 	fn transfer_from(
 		&mut self,
 		caller: Caller,
@@ -70,33 +94,18 @@ impl<T: Config> NativeFungibleHandle<T> {
 		let from = T::CrossAccountId::from_eth(from);
 		let to = T::CrossAccountId::from_eth(to);
 		let amount = amount.try_into().map_err(|_| "amount overflow")?;
-		let budget = self
-			.recorder()
-			.weight_calls_budget(<StructureWeight<T>>::find_parent());
 
-		<Pallet<T>>::transfer_from(&caller, &from, &to, amount, &budget)
-			.map_err(|e| dispatch_to_evm::<T>(e.error))?;
+		<Pallet<T>>::transfer_from(&caller, &from, &to, amount).map_err(dispatch_to_evm::<T>)?;
 		Ok(true)
 	}
 }
 
 #[solidity_interface(
-	name = UniqueNativeFungible,
+	name = NativeFungible,
 	is(ERC20),
 	enum(derive(PreDispatch))
 )]
 impl<T: Config> NativeFungibleHandle<T> where T::AccountId: From<[u8; 32]> + AsRef<[u8; 32]> {}
 
-generate_stubgen!(gen_impl, UniqueNativeFungibleCall<()>, true);
-generate_stubgen!(gen_iface, UniqueNativeFungibleCall<()>, false);
-
-impl<T: Config> CommonEvmHandler for NativeFungibleHandle<T>
-where
-	T::AccountId: From<[u8; 32]> + AsRef<[u8; 32]>,
-{
-	const CODE: &'static [u8] = include_bytes!("./stubs/UniqueNativeFungible.raw");
-
-	fn call(self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
-		call::<T, UniqueNativeFungibleCall<T>, _, _>(handle, self)
-	}
-}
+generate_stubgen!(gen_impl, NativeFungibleCall<()>, true);
+generate_stubgen!(gen_iface, NativeFungibleCall<()>, false);
