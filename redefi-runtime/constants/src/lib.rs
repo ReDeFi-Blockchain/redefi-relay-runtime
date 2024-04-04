@@ -20,6 +20,8 @@ pub mod weights;
 
 pub use self::currency::DOLLARS;
 
+pub const TOKEN_SYMBOL: &str = "BAX";
+
 /// Money matters.
 pub mod currency {
 	use primitives::Balance;
