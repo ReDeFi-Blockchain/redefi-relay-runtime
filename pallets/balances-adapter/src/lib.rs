@@ -9,18 +9,15 @@ use frame_support::{
 	traits::tokens::fungible::{Inspect, Mutate},
 };
 pub use pallet::*;
+use pallet_balances::WeightInfo;
 use pallet_evm::{account::CrossAccountId, Pallet as PalletEvm};
 use pallet_evm_coder_substrate::{SubstrateRecorder, WithRecorder};
 use sp_core::{H160, U256};
-
 pub mod erc;
 pub mod handle;
 use handle::*;
 
 pub(crate) type SelfWeightOf<T> = <T as Config>::WeightInfo;
-
-type BalanceOf<T> =
-	<<T as Config>::Balance as Inspect<<T as frame_system::Config>::AccountId>>::Balance;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -31,7 +28,6 @@ pub mod pallet {
 		storage::Key,
 		traits::{tokens::Preservation, Get},
 	};
-	use pallet_balances::WeightInfo;
 
 	use super::*;
 
@@ -54,7 +50,7 @@ pub mod pallet {
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_evm_coder_substrate::Config {
-		type Balance: Mutate<Self::AccountId, Balance = Self::NativeBalance>;
+		type Balances: Mutate<Self::AccountId, Balance = Self::NativeBalance>;
 
 		type NativeBalance: Into<U256> + TryFrom<U256> + TryFrom<u128> + Into<u128>;
 
@@ -79,18 +75,22 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub fn balance_of(account: &T::CrossAccountId) -> u128 {
-			T::Balance::balance(account.as_sub()).into()
+			T::Balances::balance(account.as_sub()).into()
 		}
 
 		pub fn total_balance(account: &T::CrossAccountId) -> u128 {
-			T::Balance::total_balance(account.as_sub()).into()
+			T::Balances::total_balance(account.as_sub()).into()
 		}
 
 		pub fn total_issuance() -> u128 {
-			T::Balance::total_issuance().into()
+			T::Balances::total_issuance().into()
 		}
 
-		pub fn allowance_internal(
+		pub fn allowance(owner: &T::CrossAccountId, spender: &T::CrossAccountId) -> U256 {
+			<Allowance<T>>::get((owner.as_eth(), spender.as_eth())).into()
+		}
+
+		pub fn approve(
 			owner: &T::CrossAccountId,
 			spender: &T::CrossAccountId,
 			amount: u128,
@@ -145,7 +145,12 @@ pub mod pallet {
 				let amount = amount
 					.try_into()
 					.map_err(|_| sp_runtime::ArithmeticError::Overflow)?;
-				T::Balance::transfer(from.as_sub(), to.as_sub(), amount, Preservation::Expendable)?;
+				T::Balances::transfer(
+					from.as_sub(),
+					to.as_sub(),
+					amount,
+					Preservation::Expendable,
+				)?;
 			};
 
 			<PalletEvm<T>>::deposit_log(

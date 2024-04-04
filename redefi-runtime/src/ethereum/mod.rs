@@ -102,3 +102,23 @@ impl pallet_ethereum::Config for Runtime {
 	// than the substrate tx size, so we can afford this
 	type ExtraDataLength = ConstU32<32>;
 }
+
+impl pallet_evm_coder_substrate::Config for Runtime {}
+
+parameter_types! {
+	pub const Decimals: u8 = 18;
+	pub Name: String = String::from_utf8_lossy(VERSION.impl_name.as_ref()).to_string();
+	pub Symbol: String = "redefi".to_string();
+	pub const AdapterContractAddress: H160 = H160([
+		0x84, 0x28, 0x99, 0xec, 0xf3, 0x80, 0x55, 0x3e, 0x8a, 0x4d, 0xe7, 0x5b, 0xf5, 0x34, 0xcd, 0xf6, 0xfb, 0xf6, 0x40, 0x49,
+	]);
+}
+impl pallet_balances_adapter::Config for Runtime {
+	type Balances = Balances;
+	type NativeBalance = Balance;
+	type ContractAddress = AdapterContractAddress;
+	type Decimals = Decimals;
+	type Name = Name;
+	type Symbol = Symbol;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Self>;
+}

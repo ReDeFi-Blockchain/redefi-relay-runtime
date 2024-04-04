@@ -166,7 +166,6 @@ pub fn native_version() -> NativeVersion {
 parameter_types! {
 	pub const Version: RuntimeVersion = VERSION;
 	pub const SS58Prefix: u16 = 12994;
-	// TODO
 	pub const ChainId: u64 = 0xBABB;
 }
 
@@ -1630,6 +1629,9 @@ construct_runtime! {
 		// EVM
 		EVM: pallet_evm = 102,
 		Ethereum: pallet_ethereum = 103,
+		EvmCoderSubstrate: pallet_evm_coder_substrate = 105,
+		BalancesAdapter: pallet_balances_adapter = 106,
+
 
 		// Sudo.
 		Sudo: pallet_sudo = 104,

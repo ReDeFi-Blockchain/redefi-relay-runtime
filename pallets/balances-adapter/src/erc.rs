@@ -1,5 +1,4 @@
 use evm_coder::{abi::AbiType, generate_stubgen, solidity_interface};
-use pallet_balances::WeightInfo;
 use pallet_evm_coder_substrate::{
 	dispatch_to_evm,
 	execution::{PreDispatch, Result},
@@ -35,8 +34,11 @@ pub enum ERC20Events {
 
 #[solidity_interface(name = ERC20, enum(derive(PreDispatch)), enum_attr(weight), expect_selector = 0x942e8b22)]
 impl<T: Config> NativeFungibleHandle<T> {
-	fn allowance(&self, _owner: Address, _spender: Address) -> Result<U256> {
-		Ok(U256::zero())
+	fn allowance(&self, owner: Address, spender: Address) -> Result<U256> {
+		self.consume_store_reads(1)?;
+		let owner = T::CrossAccountId::from_eth(owner);
+		let spender = T::CrossAccountId::from_eth(spender);
+		Ok(<Pallet<T>>::allowance(&owner, &spender))
 	}
 
 	fn approve(&mut self, caller: Caller, spender: Address, amount: U256) -> Result<bool> {
@@ -44,7 +46,7 @@ impl<T: Config> NativeFungibleHandle<T> {
 		let owner = T::CrossAccountId::from_eth(caller);
 		let spender = T::CrossAccountId::from_eth(spender);
 		let amount = amount.try_into().map_err(|_| "amount overflow")?;
-		<Pallet<T>>::allowance_internal(&owner, &spender, amount, true);
+		<Pallet<T>>::approve(&owner, &spender, amount, true);
 		Ok(true)
 	}
 
