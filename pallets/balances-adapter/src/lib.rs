@@ -13,7 +13,7 @@ use pallet_balances::WeightInfo;
 use pallet_evm::{account::CrossAccountId, Pallet as PalletEvm};
 use pallet_evm_coder_substrate::{SubstrateRecorder, WithRecorder};
 use sp_core::{H160, U256};
-pub mod erc;
+pub mod eth;
 pub mod handle;
 use handle::*;
 
@@ -103,7 +103,7 @@ pub mod pallet {
 
 			if emit_event {
 				<PalletEvm<T>>::deposit_log(
-					erc::ERC20Events::Approval {
+					eth::ERC20Events::Approval {
 						owner,
 						spender,
 						value: amount.into(),
@@ -154,7 +154,7 @@ pub mod pallet {
 			};
 
 			<PalletEvm<T>>::deposit_log(
-				erc::ERC20Events::Transfer {
+				eth::ERC20Events::Transfer {
 					from: *from.as_eth(),
 					to: *to.as_eth(),
 					value: amount.into(),

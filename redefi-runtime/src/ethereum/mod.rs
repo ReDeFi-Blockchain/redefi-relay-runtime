@@ -79,7 +79,7 @@ impl pallet_evm::Config for Runtime {
 	type PrecompilesValue = ();
 	type Currency = Balances;
 	type RuntimeEvent = RuntimeEvent;
-	type OnMethodCall = ();
+	type OnMethodCall = (pallet_balances_adapter::eth::AdapterOnMethodCall<Self>,);
 	type OnCreate = ();
 	type ChainId = ChainId;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;

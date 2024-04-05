@@ -1,4 +1,5 @@
 use evm_coder::{abi::AbiType, generate_stubgen, solidity_interface};
+use pallet_evm::{OnMethodCall, PrecompileHandle, PrecompileResult};
 use pallet_evm_coder_substrate::{
 	dispatch_to_evm,
 	execution::{PreDispatch, Result},
@@ -32,7 +33,7 @@ pub enum ERC20Events {
 	},
 }
 
-#[solidity_interface(name = ERC20, enum(derive(PreDispatch)), enum_attr(weight), expect_selector = 0x942e8b22)]
+#[solidity_interface(name = ERC20, events(ERC20Events), enum(derive(PreDispatch)), enum_attr(weight), expect_selector = 0x942e8b22)]
 impl<T: Config> NativeFungibleHandle<T> {
 	fn allowance(&self, owner: Address, spender: Address) -> Result<U256> {
 		self.consume_store_reads(1)?;
@@ -99,6 +100,35 @@ impl<T: Config> NativeFungibleHandle<T> {
 
 		<Pallet<T>>::transfer_from(&caller, &from, &to, amount).map_err(dispatch_to_evm::<T>)?;
 		Ok(true)
+	}
+}
+
+/// Implements [`OnMethodCall`], which delegates call to [`NativeFungibleHandle`]
+pub struct AdapterOnMethodCall<T: Config>(PhantomData<*const T>);
+impl<T: Config> OnMethodCall<T> for AdapterOnMethodCall<T>
+where
+	T::AccountId: AsRef<[u8; 32]>,
+{
+	fn is_reserved(contract: &sp_core::H160) -> bool {
+		contract == &T::ContractAddress::get()
+	}
+
+	fn is_used(contract: &sp_core::H160) -> bool {
+		contract == &T::ContractAddress::get()
+	}
+
+	fn call(handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
+		if handle.code_address() != T::ContractAddress::get() {
+			return None;
+		}
+
+		let adapter_handle = <NativeFungibleHandle<T>>::new_with_gas_limit(handle.remaining_gas());
+		pallet_evm_coder_substrate::call(handle, adapter_handle)
+	}
+
+	fn get_code(contract: &sp_core::H160) -> Option<Vec<u8>> {
+		(contract == &T::ContractAddress::get())
+			.then(|| include_bytes!("./stubs/NativeFungible.raw").to_vec())
 	}
 }
 

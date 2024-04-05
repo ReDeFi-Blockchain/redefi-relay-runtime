@@ -1,6 +1,6 @@
 use crate::*;
 
-/// Handle for native fungible collection
+/// Handle for native token as an ERC20 collection
 pub struct NativeFungibleHandle<T: Config>(SubstrateRecorder<T>);
 
 impl<T: Config> NativeFungibleHandle<T> {
