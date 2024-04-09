@@ -1,17 +1,15 @@
-[package]
-name = "redefi-runtime"
-build = "build.rs"
-edition = "2021"
-version = "0.1.0"
-# TODO
-# repository.workspace = true
-# version.workspace = true
-# authors.workspace = true
-# edition.workspace = true
-# license.workspace = true
+[workspace]
+resolver = "2"
+members = [
+	"redefi-runtime",
+	"redefi-runtime/constants",
+	"pallets/evm-coder-substrate",
+	"pallets/balances-adapter",
+]
+
 
 [profile.release]
-# Polkadot runtime requires unwinding.
+# Runtime requires unwinding.
 panic = "unwind"
 opt-level = 3
 
@@ -20,8 +18,12 @@ inherits = "release"
 lto = true
 codegen-units = 1
 
+[workspace.dependencies]
+# Redefi 
+polkadot-runtime-constants = { package = "polkadot-runtime-constants", path = "redefi-runtime/constants", default-features = false }
+pallet-evm-coder-substrate = { package = "pallet-evm-coder-substrate", path = "pallets/evm-coder-substrate", default-features = false }
+pallet-balances-adapter = { package = "pallet-balances-adapter", path = "pallets/balances-adapter", default-features = false }
 
-[dependencies]
 bitvec = { version = "1.0.0", default-features = false, features = ["alloc"] }
 parity-scale-codec = { version = "3.6.1", default-features = false, features = [
 	"derive",
@@ -33,7 +35,7 @@ scale-info = { version = "2.5.0", default-features = false, features = [
 log = { version = "0.4.17", default-features = false }
 rustc-hex = { version = "2.1.0", default-features = false }
 serde = { version = "1.0.188", default-features = false }
-serde_derive = { version = "1.0.117", optional = true }
+serde_derive = { version = "1.0.117" }
 static_assertions = "1.1.0"
 smallvec = "1.8.0"
 
@@ -59,6 +61,7 @@ sp-session = { default-features = false, version = "24.0.0" }
 sp-storage = { default-features = false, version = "17.0.0" }
 sp-version = { default-features = false, version = "26.0.0" }
 sp-npos-elections = { default-features = false, version = "23.0.0" }
+sp-weights = { default-features = false, version = "24.0.0" }
 
 pallet-asset-rate = { default-features = false, version = "4.0.0" }
 pallet-authority-discovery = { default-features = false, version = "25.0.0" }
@@ -105,7 +108,7 @@ pallet-staking-runtime-api = { default-features = false, version = "11.0.0" }
 pallet-sudo = { default-features = false, version = "25.0.0" }
 frame-system = { default-features = false, version = "25.0.0" }
 frame-system-rpc-runtime-api = { default-features = false, version = "23.0.0" }
-polkadot-runtime-constants = { package = "polkadot-runtime-constants", path = "constants", default-features = false }
+
 pallet-timestamp = { default-features = false, version = "24.0.0" }
 pallet-tips = { default-features = false, version = "24.0.0" }
 pallet-treasury = { default-features = false, version = "24.0.0" }
@@ -114,16 +117,16 @@ pallet-vesting = { default-features = false, version = "25.0.0" }
 pallet-utility = { default-features = false, version = "25.0.0" }
 frame-election-provider-support = { default-features = false, version = "25.0.0" }
 pallet-xcm = { default-features = false, version = "4.0.0" }
-pallet-xcm-benchmarks = { default-features = false, optional = true, version = "4.0.0" }
+pallet-xcm-benchmarks = { default-features = false, version = "4.0.0" }
 
-frame-benchmarking = { default-features = false, optional = true, version = "25.0.0" }
-frame-try-runtime = { default-features = false, optional = true, version = "0.31.0" }
-frame-system-benchmarking = { default-features = false, optional = true, version = "25.0.0" }
-pallet-election-provider-support-benchmarking = { default-features = false, optional = true, version = "24.0.0" }
-pallet-offences-benchmarking = { default-features = false, optional = true, version = "25.0.0" }
-pallet-session-benchmarking = { default-features = false, optional = true, version = "25.0.0" }
-pallet-nomination-pools-benchmarking = { default-features = false, optional = true, version = "23.0.0" }
-hex-literal = { version = "0.4.1", optional = true }
+frame-benchmarking = { default-features = false, version = "25.0.0" }
+frame-try-runtime = { default-features = false, version = "0.31.0" }
+frame-system-benchmarking = { default-features = false, version = "25.0.0" }
+pallet-election-provider-support-benchmarking = { default-features = false, version = "24.0.0" }
+pallet-offences-benchmarking = { default-features = false, version = "25.0.0" }
+pallet-session-benchmarking = { default-features = false, version = "25.0.0" }
+pallet-nomination-pools-benchmarking = { default-features = false, version = "23.0.0" }
+hex-literal = { version = "0.4.1" }
 
 runtime-common = { package = "polkadot-runtime-common", default-features = false, version = "4.0.0" }
 runtime-parachains = { package = "polkadot-runtime-parachains", default-features = false, version = "4.0.0" }
@@ -142,8 +145,12 @@ fp-self-contained = { default-features = false, features = [
 	"serde",
 ], git = "https://github.com/uniquenetwork/unique-frontier", branch = "unique-polkadot-v1.3.0" }
 
-[dev-dependencies]
-hex-literal = "0.4.1"
+# EVM
+evm-coder = { version = "=0.4.2", default-features = false, features = [
+	'bondrewd',
+] }
+evm-core = { git = "https://github.com/rust-blockchain/evm", rev = "b7b82c7e1fc57b7449d6dfa6826600de37cc1e65", default-features = false }
+
 tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 keyring = { package = "sp-keyring", version = "28.0.0" }
 sp-trie = { version = "26.0.0" }
@@ -157,230 +164,5 @@ serde_json = { version = "1.0.111", default-features = false, features = [
 	"arbitrary_precision",
 ] }
 
-
-[build-dependencies]
+#Build
 substrate-wasm-builder = { version = "14.0.0" }
-
-[features]
-default = ["std"]
-no_std = []
-only-staking = []
-std = [
-	"authority-discovery-primitives/std",
-	"babe-primitives/std",
-	"beefy-primitives/std",
-	"binary-merkle-tree/std",
-	"bitvec/std",
-	"block-builder-api/std",
-	"frame-benchmarking?/std",
-	"frame-election-provider-support/std",
-	"frame-executive/std",
-	"frame-support/std",
-	"frame-system-benchmarking?/std",
-	"frame-system-rpc-runtime-api/std",
-	"frame-system/std",
-	"frame-try-runtime/std",
-	"inherents/std",
-	"log/std",
-	"offchain-primitives/std",
-	"pallet-asset-rate/std",
-	"pallet-authority-discovery/std",
-	"pallet-authorship/std",
-	"pallet-babe/std",
-	"pallet-bags-list/std",
-	"pallet-balances/std",
-	"pallet-beefy/std",
-	"pallet-beefy-mmr/std",
-	"pallet-bounties/std",
-	"pallet-child-bounties/std",
-	"pallet-collective/std",
-	"pallet-conviction-voting/std",
-	"pallet-democracy/std",
-	"pallet-election-provider-multi-phase/std",
-	"pallet-election-provider-support-benchmarking?/std",
-	"pallet-elections-phragmen/std",
-	"pallet-fast-unstake/std",
-	"pallet-grandpa/std",
-	"pallet-identity/std",
-	"pallet-im-online/std",
-	"pallet-indices/std",
-	"pallet-membership/std",
-	"pallet-message-queue/std",
-	"pallet-mmr/std",
-	"pallet-multisig/std",
-	"pallet-nomination-pools-benchmarking?/std",
-	"pallet-nomination-pools-runtime-api/std",
-	"pallet-nomination-pools/std",
-	"pallet-offences-benchmarking?/std",
-	"pallet-offences/std",
-	"pallet-preimage/std",
-	"pallet-proxy/std",
-	"pallet-referenda/std",
-	"pallet-scheduler/std",
-	"pallet-session-benchmarking?/std",
-	"pallet-session/std",
-	"pallet-staking-reward-fn/std",
-	"pallet-staking-runtime-api/std",
-	"pallet-staking/std",
-	"pallet-sudo/std",
-	"pallet-timestamp/std",
-	"pallet-tips/std",
-	"pallet-transaction-payment-rpc-runtime-api/std",
-	"pallet-transaction-payment/std",
-	"pallet-treasury/std",
-	"pallet-utility/std",
-	"pallet-vesting/std",
-	"pallet-whitelist/std",
-	"pallet-xcm-benchmarks?/std",
-	"pallet-xcm/std",
-	"parity-scale-codec/std",
-	"polkadot-runtime-constants/std",
-	"primitives/std",
-	"runtime-common/std",
-	"runtime-parachains/std",
-	"rustc-hex/std",
-	"scale-info/std",
-	"serde/std",
-	"serde_derive",
-	"sp-api/std",
-	"sp-application-crypto/std",
-	"sp-arithmetic/std",
-	"sp-core/std",
-	"sp-genesis-builder/std",
-	"sp-io/std",
-	"sp-mmr-primitives/std",
-	"sp-npos-elections/std",
-	"sp-runtime/std",
-	"sp-session/std",
-	"sp-staking/std",
-	"sp-std/std",
-	"sp-storage/std",
-	"sp-tracing/std",
-	"sp-version/std",
-	"tx-pool-api/std",
-	"xcm-builder/std",
-	"xcm-executor/std",
-	"xcm/std",
-	"pallet-evm/std",
-	"pallet-ethereum/std",
-]
-runtime-benchmarks = [
-	"frame-benchmarking/runtime-benchmarks",
-	"frame-election-provider-support/runtime-benchmarks",
-	"frame-support/runtime-benchmarks",
-	"frame-system-benchmarking/runtime-benchmarks",
-	"frame-system/runtime-benchmarks",
-	"hex-literal",
-	"pallet-asset-rate/runtime-benchmarks",
-	"pallet-babe/runtime-benchmarks",
-	"pallet-bags-list/runtime-benchmarks",
-	"pallet-balances/runtime-benchmarks",
-	"pallet-bounties/runtime-benchmarks",
-	"pallet-child-bounties/runtime-benchmarks",
-	"pallet-collective/runtime-benchmarks",
-	"pallet-conviction-voting/runtime-benchmarks",
-	"pallet-democracy/runtime-benchmarks",
-	"pallet-election-provider-multi-phase/runtime-benchmarks",
-	"pallet-election-provider-support-benchmarking/runtime-benchmarks",
-	"pallet-elections-phragmen/runtime-benchmarks",
-	"pallet-fast-unstake/runtime-benchmarks",
-	"pallet-grandpa/runtime-benchmarks",
-	"pallet-identity/runtime-benchmarks",
-	"pallet-im-online/runtime-benchmarks",
-	"pallet-indices/runtime-benchmarks",
-	"pallet-membership/runtime-benchmarks",
-	"pallet-message-queue/runtime-benchmarks",
-	"pallet-mmr/runtime-benchmarks",
-	"pallet-multisig/runtime-benchmarks",
-	"pallet-nomination-pools-benchmarking/runtime-benchmarks",
-	"pallet-nomination-pools/runtime-benchmarks",
-	"pallet-offences-benchmarking/runtime-benchmarks",
-	"pallet-offences/runtime-benchmarks",
-	"pallet-preimage/runtime-benchmarks",
-	"pallet-proxy/runtime-benchmarks",
-	"pallet-referenda/runtime-benchmarks",
-	"pallet-scheduler/runtime-benchmarks",
-	"pallet-session-benchmarking/runtime-benchmarks",
-	"pallet-staking/runtime-benchmarks",
-	"pallet-sudo/runtime-benchmarks",
-	"pallet-timestamp/runtime-benchmarks",
-	"pallet-tips/runtime-benchmarks",
-	"pallet-treasury/runtime-benchmarks",
-	"pallet-utility/runtime-benchmarks",
-	"pallet-vesting/runtime-benchmarks",
-	"pallet-whitelist/runtime-benchmarks",
-	"pallet-xcm-benchmarks/runtime-benchmarks",
-	"pallet-xcm/runtime-benchmarks",
-	"primitives/runtime-benchmarks",
-	"runtime-common/runtime-benchmarks",
-	"runtime-parachains/runtime-benchmarks",
-	"sp-runtime/runtime-benchmarks",
-	"sp-staking/runtime-benchmarks",
-	"xcm-builder/runtime-benchmarks",
-	"xcm-executor/runtime-benchmarks",
-	"pallet-ethereum/runtime-benchmarks",
-]
-try-runtime = [
-	"frame-election-provider-support/try-runtime",
-	"frame-executive/try-runtime",
-	"frame-support/try-runtime",
-	"frame-system/try-runtime",
-	"frame-try-runtime",
-	"frame-try-runtime/try-runtime",
-	"pallet-asset-rate/try-runtime",
-	"pallet-authority-discovery/try-runtime",
-	"pallet-authorship/try-runtime",
-	"pallet-babe/try-runtime",
-	"pallet-bags-list/try-runtime",
-	"pallet-balances/try-runtime",
-	"pallet-beefy-mmr/try-runtime",
-	"pallet-beefy/try-runtime",
-	"pallet-bounties/try-runtime",
-	"pallet-child-bounties/try-runtime",
-	"pallet-collective/try-runtime",
-	"pallet-conviction-voting/try-runtime",
-	"pallet-democracy/try-runtime",
-	"pallet-election-provider-multi-phase/try-runtime",
-	"pallet-elections-phragmen/try-runtime",
-	"pallet-fast-unstake/try-runtime",
-	"pallet-grandpa/try-runtime",
-	"pallet-identity/try-runtime",
-	"pallet-im-online/try-runtime",
-	"pallet-indices/try-runtime",
-	"pallet-membership/try-runtime",
-	"pallet-message-queue/try-runtime",
-	"pallet-mmr/try-runtime",
-	"pallet-multisig/try-runtime",
-	"pallet-nomination-pools/try-runtime",
-	"pallet-offences/try-runtime",
-	"pallet-preimage/try-runtime",
-	"pallet-proxy/try-runtime",
-	"pallet-referenda/try-runtime",
-	"pallet-scheduler/try-runtime",
-	"pallet-session/try-runtime",
-	"pallet-staking/try-runtime",
-	"pallet-sudo/try-runtime",
-	"pallet-timestamp/try-runtime",
-	"pallet-tips/try-runtime",
-	"pallet-transaction-payment/try-runtime",
-	"pallet-treasury/try-runtime",
-	"pallet-utility/try-runtime",
-	"pallet-vesting/try-runtime",
-	"pallet-whitelist/try-runtime",
-	"pallet-xcm/try-runtime",
-	"runtime-common/try-runtime",
-	"runtime-parachains/try-runtime",
-	"sp-runtime/try-runtime",
-	"pallet-evm/try-runtime",
-	"pallet-ethereum/try-runtime",
-]
-
-# A feature that should be enabled when the runtime should be build for on-chain
-# deployment. This will disable stuff that shouldn't be part of the on-chain wasm
-# to make it smaller like logging for example.
-on-chain-release-build = ["sp-api/disable-logging"]
-
-# Set timing constants (e.g. session period) to faster versions to speed up testing.
-fast-runtime = []
-
-runtime-metrics = ["runtime-parachains/runtime-metrics", "sp-io/with-tracing"]

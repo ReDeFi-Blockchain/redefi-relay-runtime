@@ -1,0 +1,34 @@
+[package]
+name = "polkadot-runtime-constants"
+edition = "2021"
+version = "0.1.0"
+#TODO
+# repository.workspace = true
+# version.workspace = true
+# authors.workspace = true
+# edition.workspace = true
+# license.workspace = true
+
+[dependencies]
+smallvec = { workspace = true }
+
+frame-support = { workspace = true }
+primitives = { workspace = true }
+runtime-common = { workspace = true }
+sp-runtime = { workspace = true }
+sp-weights = { workspace = true }
+sp-core = { workspace = true }
+
+xcm = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+	"frame-support/std",
+	"primitives/std",
+	"runtime-common/std",
+	"sp-core/std",
+	"sp-runtime/std",
+	"sp-weights/std",
+	"xcm/std",
+]

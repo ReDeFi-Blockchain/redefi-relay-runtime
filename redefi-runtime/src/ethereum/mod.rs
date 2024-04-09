@@ -8,6 +8,7 @@ use frame_support::{
 };
 use pallet_ethereum::PostLogContent;
 use pallet_evm::{EnsureAddressTruncated, HashedAddressMapping};
+use polkadot_runtime_constants::TOKEN_SYMBOL;
 use sp_runtime::{traits::ConstU32, Perbill, RuntimeAppPublic};
 
 use crate::*;
@@ -78,7 +79,7 @@ impl pallet_evm::Config for Runtime {
 	type PrecompilesValue = ();
 	type Currency = Balances;
 	type RuntimeEvent = RuntimeEvent;
-	type OnMethodCall = ();
+	type OnMethodCall = (pallet_balances_adapter::eth::AdapterOnMethodCall<Self>,);
 	type OnCreate = ();
 	type ChainId = ChainId;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
@@ -101,4 +102,24 @@ impl pallet_ethereum::Config for Runtime {
 	// Space for revert reason. Ethereum transactions are not cheap, and overall size is much less
 	// than the substrate tx size, so we can afford this
 	type ExtraDataLength = ConstU32<32>;
+}
+
+impl pallet_evm_coder_substrate::Config for Runtime {}
+
+parameter_types! {
+	pub const Decimals: u8 = 18;
+	pub Name: String = String::from_utf8_lossy(VERSION.impl_name.as_ref()).to_string();
+	pub Symbol: String = TOKEN_SYMBOL.to_string();
+	pub const AdapterContractAddress: H160 = H160([
+		0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBA, 0xBB,
+	]);
+}
+impl pallet_balances_adapter::Config for Runtime {
+	type Balances = Balances;
+	type NativeBalance = Balance;
+	type ContractAddress = AdapterContractAddress;
+	type Decimals = Decimals;
+	type Name = Name;
+	type Symbol = Symbol;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Self>;
 }
