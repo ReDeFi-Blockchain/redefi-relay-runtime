@@ -36,6 +36,7 @@ pub mod pallet {
 		// TODO Add more info.
 		/// Indicates a failure with the `spender`’s `allowance`. Used in transfers.
 		ERC20InsufficientAllowance,
+		ERC20InvalidReceiver,
 	}
 
 	#[pallet::storage]
@@ -95,7 +96,9 @@ pub mod pallet {
 			spender: &T::CrossAccountId,
 			amount: u128,
 			emit_event: bool,
-		) {
+		) -> DispatchResult {
+			Self::check_receiver(spender)?;
+
 			let owner = *owner.as_eth();
 			let spender = *spender.as_eth();
 
@@ -110,7 +113,9 @@ pub mod pallet {
 					}
 					.to_log(T::ContractAddress::get()),
 				);
-			}
+			};
+
+			Ok(())
 		}
 
 		/// Updates `owner` s allowance for `spender` based on spent `value`.
@@ -141,7 +146,9 @@ pub mod pallet {
 			to: &T::CrossAccountId,
 			amount: u128,
 		) -> DispatchResult {
-			if from != to && amount != 0 {
+			Self::check_receiver(to)?;
+
+			{
 				let amount = amount
 					.try_into()
 					.map_err(|_| sp_runtime::ArithmeticError::Overflow)?;
@@ -151,7 +158,7 @@ pub mod pallet {
 					amount,
 					Preservation::Expendable,
 				)?;
-			};
+			}
 
 			<PalletEvm<T>>::deposit_log(
 				eth::ERC20Events::Transfer {
@@ -183,6 +190,14 @@ pub mod pallet {
 		) -> DispatchResult {
 			Self::spend_allowance(from, spender, amount)?;
 			Self::transfer(from, to, amount)
+		}
+
+		pub fn check_receiver(receiver: &T::CrossAccountId) -> DispatchResult {
+			ensure!(
+				&T::CrossAccountId::from_eth(H160::zero()) != receiver,
+				<Error<T>>::ERC20InvalidReceiver
+			);
+			Ok(())
 		}
 	}
 }
