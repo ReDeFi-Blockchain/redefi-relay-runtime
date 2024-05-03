@@ -141,7 +141,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_023,
+	spec_version: 1_003_0_024,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,
@@ -1677,13 +1677,13 @@ impl Get<Perbill> for NominationPoolsMigrationV4OldPallet {
 pub type Migrations = migrations::Unreleased;
 
 /// The runtime migrations per release.
-#[allow(deprecated, missing_docs)]
+#[allow(deprecated, missing_docs, unused_imports)]
 pub mod migrations {
 
 	use crate::*;
 
 	/// Unreleased migrations. Add new ones here:
-	pub type Unreleased = (pallet_evm_assets::migration::InitializationWithSudoAsHolder<Runtime>,);
+	pub type Unreleased = ();
 }
 
 /// Unchecked extrinsic type as expected by this runtime (Frontier wrapped extr).
