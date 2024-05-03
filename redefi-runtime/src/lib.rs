@@ -1683,7 +1683,7 @@ pub mod migrations {
 	use crate::*;
 
 	/// Unreleased migrations. Add new ones here:
-	pub type Unreleased = ();
+	pub type Unreleased = (pallet_evm_assets::migration::InitializationWithSudoAsHolder<Runtime>,);
 }
 
 /// Unchecked extrinsic type as expected by this runtime (Frontier wrapped extr).
