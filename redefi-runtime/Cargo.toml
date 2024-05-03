@@ -129,6 +129,7 @@ fp-rpc = { workspace = true }
 fp-self-contained = { workspace = true }
 pallet-balances-adapter = { workspace = true }
 pallet-evm-coder-substrate = { workspace = true }
+pallet-evm-assets = { workspace = true }
 
 [dev-dependencies]
 tiny-keccak = { workspace = true }

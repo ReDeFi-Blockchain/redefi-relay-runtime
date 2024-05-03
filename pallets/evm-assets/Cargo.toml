@@ -1,0 +1,48 @@
+[package]
+description = "EVM native assets management pallet"
+edition.workspace = true
+homepage = "https://substrate.io"
+license = "Apache-2.0"
+name = "pallet-evm-assets"
+readme = "README.md"
+version = "0.1.0"
+
+[dependencies]
+# Substrate
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+pallet-balances = { workspace = true }
+sp-core = { workspace = true }
+sp-io = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+#Parity
+parity-scale-codec = { workspace = true }
+scale-info = { workspace = true }
+
+# Redefi
+evm-coder = { workspace = true }
+pallet-evm = { workspace = true }
+
+#Local
+pallet-evm-coder-substrate = { workspace = true }
+
+#other
+bitflags = "1.3"
+hex-literal = { workspace = true }
+log = { workspace = true }
+[features]
+default = ["std"]
+std = [
+	"evm-coder/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-balances/std",
+	"pallet-evm-coder-substrate/std",
+	"pallet-evm/std",
+	"sp-core/std",
+	"sp-io/std",
+	"sp-std/std",
+]
+stubgen = ["evm-coder/stubgen"]
+try-runtime = ["frame-support/try-runtime"]

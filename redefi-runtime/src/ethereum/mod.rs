@@ -123,3 +123,13 @@ impl pallet_balances_adapter::Config for Runtime {
 	type Symbol = Symbol;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Self>;
 }
+
+parameter_types! {
+	pub Prefix: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
+	pub StringLimit: u32 = 32;
+}
+impl pallet_evm_assets::Config for Runtime {
+	type AddressPrefix = Prefix;
+
+	type StringLimit = StringLimit;
+}
