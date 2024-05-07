@@ -159,7 +159,7 @@ impl<T: Config> Pallet<T> {
 				current_allowance >= amount,
 				<Error<T>>::ERC20InsufficientAllowance
 			);
-			return Self::approve(asset, owner, spender, amount, false);
+			return Self::approve(asset, owner, spender, current_allowance - amount, false);
 		}
 		Ok(())
 	}

@@ -141,7 +141,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_024,
+	spec_version: 1_003_0_025,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,
@@ -167,7 +167,16 @@ pub fn native_version() -> NativeVersion {
 parameter_types! {
 	pub const Version: RuntimeVersion = VERSION;
 	pub const SS58Prefix: u16 = 12994;
+}
+
+#[cfg(not(feature = "testnet-id"))]
+parameter_types! {
 	pub const ChainId: u64 = 0xBABB;
+}
+
+#[cfg(feature = "testnet-id")]
+parameter_types! {
+	pub const ChainId: u64 = 147803;
 }
 
 impl frame_system::Config for Runtime {
@@ -1683,7 +1692,7 @@ pub mod migrations {
 	use crate::*;
 
 	/// Unreleased migrations. Add new ones here:
-	pub type Unreleased = (pallet_evm_assets::migration::InitializationWithSudoAsHolder<Runtime>,);
+	pub type Unreleased = ();
 }
 
 /// Unchecked extrinsic type as expected by this runtime (Frontier wrapped extr).
