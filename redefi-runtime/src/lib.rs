@@ -1638,7 +1638,8 @@ construct_runtime! {
 		// Asset rate.
 		AssetRate: pallet_asset_rate::{Pallet, Call, Storage, Event<T>} = 101,
 
-		// Sudo.
+		// Sudo. Must be declared before EvmAssets
+		// since the latter uses the Sudo key when generating genesis
 		Sudo: pallet_sudo = 104,
 
 		// EVM
