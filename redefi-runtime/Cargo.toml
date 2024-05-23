@@ -248,6 +248,7 @@ std = [
 	"pallet-evm/std",
 	"pallet-ethereum/std",
 	"pallet-balances-adapter/std",
+	"pallet-evm-assets/std",
 	"pallet-evm-coder-substrate/std",
 ]
 runtime-benchmarks = [
