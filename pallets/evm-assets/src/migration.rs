@@ -25,7 +25,7 @@ pub(crate) fn init_red_with<T: Config>(accounts: &[T::AccountId], owner: &T::Acc
 		});
 
 	let red_meta = AssetMetadata::<BoundedVec<u8, T::StringLimit>> {
-		name: "redefi".as_bytes().to_vec().try_into().unwrap(),
+		name: "ReDeFi RED".as_bytes().to_vec().try_into().unwrap(),
 		symbol: "RED".as_bytes().to_vec().try_into().unwrap(),
 		decimals: 18,
 		is_frozen: false,
@@ -103,6 +103,20 @@ where
 		<SupportedAssets<T>>::set(supported_assets);
 
 		T::DbWeight::get().reads_writes(4, 10)
+	}
+}
+
+pub struct FixRedMeta<T: Config>(PhantomData<T>);
+impl<T: Config> OnRuntimeUpgrade for FixRedMeta<T>
+where
+	T::AccountId: for<'a> TryFrom<&'a [u8]>,
+{
+	fn on_runtime_upgrade() -> Weight {
+		<Metadata<T>>::mutate(RED_ID, |m| {
+			let Some(meta) = m else { return };
+			meta.name = b"ReDeFi RED".to_vec().try_into().unwrap();
+		});
+		T::DbWeight::get().reads_writes(1, 1)
 	}
 }
 
