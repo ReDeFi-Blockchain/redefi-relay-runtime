@@ -105,3 +105,31 @@ where
 		T::DbWeight::get().reads_writes(4, 10)
 	}
 }
+
+pub(crate) fn try_generate_genesis_from_sudo<T: Config>() -> GenesisConfig<T>
+where
+	T::AccountId: for<'a> TryFrom<&'a [u8]>,
+{
+	let sudoer_raw_key = get(&SUDO_STORAGE_KEY);
+	if sudoer_raw_key.is_none() {
+		log::error!(
+		target: LOG_TARGET,
+				"Sudo key not found - migration incomplete"
+			);
+	}
+	let sudoer_raw_key = sudoer_raw_key.unwrap();
+	let sudoer_key = T::AccountId::try_from(sudoer_raw_key.as_ref());
+
+	if sudoer_key.is_err() {
+		log::error!(
+		target: LOG_TARGET,
+				"Failed to deserialize sudo key. Value: {:?}. Migration Failed",
+				sudoer_raw_key
+			);
+	}
+	let sudoer_key = sudoer_key.ok().unwrap();
+	GenesisConfig {
+		accounts: vec![sudoer_key],
+		owner: None,
+	}
+}
