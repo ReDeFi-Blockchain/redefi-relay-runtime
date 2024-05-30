@@ -141,7 +141,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_026,
+	spec_version: 1_003_0_027,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,
@@ -1638,16 +1638,16 @@ construct_runtime! {
 		// Asset rate.
 		AssetRate: pallet_asset_rate::{Pallet, Call, Storage, Event<T>} = 101,
 
+		// Sudo. Must be declared before EvmAssets
+		// since the latter uses the Sudo key when generating genesis
+		Sudo: pallet_sudo = 104,
+
 		// EVM
 		EVM: pallet_evm = 102,
 		Ethereum: pallet_ethereum = 103,
 		EvmCoderSubstrate: pallet_evm_coder_substrate = 105,
 		BalancesAdapter: pallet_balances_adapter = 106,
 		EvmAssets: pallet_evm_assets = 107,
-
-
-		// Sudo.
-		Sudo: pallet_sudo = 104,
 	}
 }
 
@@ -1695,7 +1695,7 @@ pub mod migrations {
 	use crate::*;
 
 	/// Unreleased migrations. Add new ones here:
-	pub type Unreleased = ();
+	pub type Unreleased = (pallet_evm_assets::migration::FixRedMeta<Runtime>);
 }
 
 /// Unchecked extrinsic type as expected by this runtime (Frontier wrapped extr).

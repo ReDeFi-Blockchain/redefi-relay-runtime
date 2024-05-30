@@ -26,6 +26,7 @@ pub(crate) const LOG_TARGET: &str = "runtime::evm-assets";
 #[frame_support::pallet]
 pub mod pallet {
 	use frame_support::Blake2_128Concat;
+	use migration::try_generate_genesis_from_sudo;
 
 	use self::migration::init_assets_with;
 	use super::*;
@@ -111,17 +112,26 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
-		accounts: Vec<T::AccountId>,
-		owner: Option<T::AccountId>,
+		pub accounts: Vec<T::AccountId>,
+		pub owner: Option<T::AccountId>,
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T>
+	where
+		T::AccountId: for<'a> TryFrom<&'a [u8]>,
+	{
 		fn build(&self) {
-			init_assets_with::<T>(
-				&self.accounts[..],
-				self.owner.as_ref().unwrap_or(&self.accounts[0]),
-			)
+			if !self.accounts.is_empty() {
+				init_assets_with::<T>(
+					&self.accounts[..],
+					self.owner.as_ref().unwrap_or(&self.accounts[0]),
+				);
+				return;
+			};
+
+			let sudo_config = try_generate_genesis_from_sudo::<T>();
+			init_assets_with::<T>(&sudo_config.accounts, &sudo_config.accounts[0]);
 		}
 	}
 }

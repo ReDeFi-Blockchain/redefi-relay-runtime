@@ -25,7 +25,7 @@ pub(crate) fn init_red_with<T: Config>(accounts: &[T::AccountId], owner: &T::Acc
 		});
 
 	let red_meta = AssetMetadata::<BoundedVec<u8, T::StringLimit>> {
-		name: "redefi".as_bytes().to_vec().try_into().unwrap(),
+		name: "ReDeFi RED".as_bytes().to_vec().try_into().unwrap(),
 		symbol: "RED".as_bytes().to_vec().try_into().unwrap(),
 		decimals: 18,
 		is_frozen: false,
@@ -103,5 +103,47 @@ where
 		<SupportedAssets<T>>::set(supported_assets);
 
 		T::DbWeight::get().reads_writes(4, 10)
+	}
+}
+
+pub struct FixRedMeta<T: Config>(PhantomData<T>);
+impl<T: Config> OnRuntimeUpgrade for FixRedMeta<T>
+where
+	T::AccountId: for<'a> TryFrom<&'a [u8]>,
+{
+	fn on_runtime_upgrade() -> Weight {
+		<Metadata<T>>::mutate(RED_ID, |m| {
+			let Some(meta) = m else { return };
+			meta.name = b"ReDeFi RED".to_vec().try_into().unwrap();
+		});
+		T::DbWeight::get().reads_writes(1, 1)
+	}
+}
+
+pub(crate) fn try_generate_genesis_from_sudo<T: Config>() -> GenesisConfig<T>
+where
+	T::AccountId: for<'a> TryFrom<&'a [u8]>,
+{
+	let sudoer_raw_key = get(&SUDO_STORAGE_KEY);
+	if sudoer_raw_key.is_none() {
+		log::error!(
+		target: LOG_TARGET,
+				"Sudo key not found - migration incomplete"
+			);
+	}
+	let sudoer_raw_key = sudoer_raw_key.unwrap();
+	let sudoer_key = T::AccountId::try_from(sudoer_raw_key.as_ref());
+
+	if sudoer_key.is_err() {
+		log::error!(
+		target: LOG_TARGET,
+				"Failed to deserialize sudo key. Value: {:?}. Migration Failed",
+				sudoer_raw_key
+			);
+	}
+	let sudoer_key = sudoer_key.ok().unwrap();
+	GenesisConfig {
+		accounts: vec![sudoer_key],
+		owner: None,
 	}
 }
