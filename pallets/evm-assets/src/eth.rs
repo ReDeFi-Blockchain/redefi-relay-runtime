@@ -147,7 +147,7 @@ where
 	) -> Result<()> {
 		let amount = amount.try_into().map_err(|_| "value overflow")?;
 		let locator = <T as Config>::ChainLocator::get();
-		let destination = locator.get(&chain_id).ok_or("chain not found")?.clone();
+		let destination = *locator.get(&chain_id).ok_or("chain not found")?;
 		let relay_network = T::UniversalLocation::get()
 			.global_consensus()
 			.map_err(|_| "unable to get global consensus")?;
