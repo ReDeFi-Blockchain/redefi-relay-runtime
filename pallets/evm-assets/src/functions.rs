@@ -174,4 +174,25 @@ impl<T: Config> Pallet<T> {
 		Self::spend_allowance(asset, from, spender, amount)?;
 		Self::transfer(asset, from, to, amount)
 	}
+
+	pub fn check_owner(asset: &AssetId, owner: &Address) -> DispatchResult {
+		ensure!(
+			owner
+				== &<Asset<T>>::get(asset)
+					.ok_or(<Error<T>>::AssetNotFound)?
+					.owner,
+			<Error<T>>::OwnableUnauthorizedAccount
+		);
+		Ok(())
+	}
+
+	pub fn mint(asset: &AssetId, to: &Address, amount: Balance) -> DispatchResult {
+		Self::check_receiver(to)?;
+		Self::update(asset, &Address::zero(), to, amount)
+	}
+
+	pub fn burn(asset: &AssetId, account: &Address, value: Balance) -> DispatchResult {
+		ensure!(account != &Address::zero(), <Error<T>>::ERC20InvalidSender);
+		Self::update(asset, account, &Address::zero(), value)
+	}
 }

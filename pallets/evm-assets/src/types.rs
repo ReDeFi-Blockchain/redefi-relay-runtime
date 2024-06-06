@@ -24,6 +24,7 @@ use super::*;
 pub(super) type AssetId = u128;
 pub(super) type Balance = u128;
 pub(super) type Address = H160;
+pub(crate) type ChainId = u64;
 
 pub(crate) const CURRENCY: Balance = 1_000_000;
 pub(crate) const NATIVE: Balance = 1_000_000_000_000_000_000;

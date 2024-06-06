@@ -18,7 +18,7 @@
 
 use frame_support::{
 	match_types, parameter_types,
-	traits::{Contains, Equals, Everything, Nothing},
+	traits::{Contains, ContainsPair, Equals, Everything, Nothing},
 	weights::Weight,
 };
 use frame_system::EnsureRoot;
@@ -34,7 +34,7 @@ use runtime_common::{
 	ToAuthor,
 };
 use sp_core::ConstU32;
-use xcm::latest::prelude::*;
+use xcm::latest::{prelude::*, Fungibility};
 use xcm_builder::{
 	AccountId32Aliases, AllowExplicitUnpaidExecutionFrom, AllowKnownQueryResponses,
 	AllowSubscriptionsFrom, AllowTopLevelPaidExecutionFrom, ChildParachainAsNative,
@@ -46,11 +46,7 @@ use xcm_builder::{
 };
 use xcm_executor::traits::WithOriginFilter;
 
-use super::{
-	parachains_origin, AccountId, AllPalletsWithSystem, Balances, Dmp, FellowshipAdmin,
-	GeneralAdmin, ParaId, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin, StakingAdmin,
-	TransactionByteFee, Treasurer, Treasury, WeightToFee, XcmPallet,
-};
+use super::*;
 
 parameter_types! {
 	pub const RootLocation: MultiLocation = Here.into_location();
@@ -58,8 +54,8 @@ parameter_types! {
 	/// chain, we make it synonymous with it and thus it is the `Here` location, which means "equivalent to
 	/// the context".
 	pub const TokenLocation: MultiLocation = Here.into_location();
-	/// The Polkadot network ID. This is named.
-	pub const ThisNetwork: NetworkId = NetworkId::Polkadot;
+	/// The ReDeFi network ID. This is named.
+	pub const ThisNetwork: NetworkId = NetworkId::Ethereum { chain_id: ChainId::get() };
 	/// Our location in the universe of consensus systems.
 	pub const UniversalLocation: InteriorMultiLocation = X1(GlobalConsensus(ThisNetwork::get()));
 	/// The Checking Account, which holds any native assets that have been teleported out and not back in (yet).
@@ -81,6 +77,38 @@ pub type SovereignAccountOf = (
 	HashedDescription<AccountId, DescribeFamily<DescribeAllTerminal>>,
 );
 
+pub struct CrossAccountLocationMapper<LocationConverter, Runtime>(
+	PhantomData<(LocationConverter, Runtime)>,
+)
+where
+	Runtime: pallet_evm::Config,
+	LocationConverter: ConvertLocation<<Runtime as frame_system::Config>::AccountId>;
+
+impl<Runtime, LocationConverter> ConvertLocation<H160>
+	for CrossAccountLocationMapper<LocationConverter, Runtime>
+where
+	Runtime: pallet_evm::Config,
+	LocationConverter: ConvertLocation<<Runtime as frame_system::Config>::AccountId>,
+{
+	fn convert_location(location: &Location) -> Option<H160> {
+		LocationConverter::convert_location(location).map(|account| {
+			*<Runtime as pallet_evm::Config>::CrossAccountId::from_sub(account).as_eth()
+		})
+	}
+}
+
+/// Type for specifying how a `Location` can be converted into an `AccountId`. This is used
+/// when determining ownership of accounts for asset transacting and when attempting to use XCM
+/// `Transact` in order to determine the dispatch Origin.
+pub type LocationToAccountId20 = (
+	// The Parachain origin converts to the `AccountId20`.
+	CrossAccountLocationMapper<ChildParachainConvertsVia<ParaId, AccountId>, Runtime>,
+	AccountKey20Aliases<ThisNetwork, H160>,
+);
+
+pub type EvmAssetsTransactor =
+	FungiblesAdapter<EvmAssets, EvmAssets, LocationToAccountId20, H160, NoChecking, ()>;
+
 /// Our asset transactor. This is what allows us to interact with the runtime assets from the point
 /// of view of XCM-only concepts like `MultiLocation` and `MultiAsset`.
 ///
@@ -97,6 +125,8 @@ pub type LocalAssetTransactor = XcmCurrencyAdapter<
 	// We track our teleports in/out to keep total issuance correct.
 	LocalCheckAccount,
 >;
+
+pub type AssetTransactor = (EvmAssetsTransactor, LocalAssetTransactor);
 
 /// The means that we convert an XCM origin `MultiLocation` into the runtime's `Origin` type for
 /// local dispatch. This is a conversion function from an `OriginKind` type along with the
@@ -148,21 +178,74 @@ parameter_types! {
 	pub const MaxAssetsIntoHolding: u32 = 64;
 }
 
-/// Polkadot Relay recognizes/respects AssetHub, Collectives, and BridgeHub chains as teleporters.
-pub type TrustedTeleporters = (
-	xcm_builder::Case<DotForAssetHub>,
-	xcm_builder::Case<DotForCollectives>,
-	xcm_builder::Case<DotForBridgeHub>,
-);
+pub struct EvmAssetsOnRelay;
+impl ContainsPair<MultiAsset, MultiLocation> for EvmAssetsOnRelay {
+	fn contains(a: &MultiAsset, b: &MultiLocation) -> bool {
+		let MultiAsset {
+			id:
+				AssetId::Concrete(MultiLocation {
+					parents: 0,
+					interior:
+						Junctions::X1(Junction::AccountKey20 {
+							network: Some(network),
+							key,
+						}),
+				}),
+			fun: Fungibility::Fungible(_),
+		} = a
+		else {
+			return false;
+		};
+
+		if *network != ThisNetwork::get() {
+			return false;
+		}
+
+		if !key.starts_with(&[0xFF, 0xFF, 0xFF, 0xFF]) {
+			return false;
+		}
+
+		let MultiLocation {
+			parents: 0,
+			interior: Junctions::X1(Junction::Parachain(_)),
+		} = b
+		else {
+			return false;
+		};
+		true
+	}
+}
+
+#[allow(unused_parens)]
+/// ReDeFi Relay recognizes/respects EvmAssets as teleporters.
+pub type TrustedTeleporters = (EvmAssetsOnRelay);
+
+pub struct FreeForAll;
+
+impl WeightTrader for FreeForAll {
+	fn new() -> Self {
+		Self
+	}
+
+	fn buy_weight(
+		&mut self,
+		weight: Weight,
+		payment: Assets,
+		_xcm: &XcmContext,
+	) -> Result<Assets, XcmError> {
+		log::trace!(target: "fassets::weight", "buy_weight weight: {:?}, payment: {:?}", weight, payment);
+		Ok(payment)
+	}
+}
 
 match_types! {
 	pub type OnlyParachains: impl Contains<MultiLocation> = {
 		MultiLocation { parents: 0, interior: X1(Parachain(_)) }
 	};
-	pub type CollectivesOrFellows: impl Contains<MultiLocation> = {
-		MultiLocation { parents: 0, interior: X1(Parachain(COLLECTIVES_ID)) } |
-		MultiLocation { parents: 0, interior: X2(Parachain(COLLECTIVES_ID), Plurality { id: BodyId::Technical, .. }) }
-	};
+	// pub type CollectivesOrFellows: impl Contains<MultiLocation> = {
+	// 	MultiLocation { parents: 0, interior: X1(Parachain(COLLECTIVES_ID)) } |
+	// 	MultiLocation { parents: 0, interior: X2(Parachain(COLLECTIVES_ID), Plurality { id: BodyId::Technical, .. }) }
+	// };
 	pub type LocalPlurality: impl Contains<MultiLocation> = {
 		MultiLocation { parents: 0, interior: X1(Plurality { .. }) }
 	};
@@ -181,156 +264,12 @@ pub type Barrier = TrailingSetTopicAsId<(
 			// Subscriptions for version tracking are OK.
 			AllowSubscriptionsFrom<OnlyParachains>,
 			// Collectives and Fellows plurality get free execution.
-			AllowExplicitUnpaidExecutionFrom<CollectivesOrFellows>,
+			// AllowExplicitUnpaidExecutionFrom<CollectivesOrFellows>,
 		),
 		UniversalLocation,
 		ConstU32<8>,
 	>,
 )>;
-
-/// A call filter for the XCM Transact instruction. This is a temporary measure until we
-/// properly account for proof size weights.
-///
-/// Calls that are allowed through this filter must:
-/// 1. Have a fixed weight;
-/// 2. Cannot lead to another call being made;
-/// 3. Have a defined proof size weight, e.g. no unbounded vecs in call parameters.
-pub struct SafeCallFilter;
-impl Contains<RuntimeCall> for SafeCallFilter {
-	fn contains(call: &RuntimeCall) -> bool {
-		#[cfg(feature = "runtime-benchmarks")]
-		{
-			if matches!(
-				call,
-				RuntimeCall::System(frame_system::Call::remark_with_event { .. })
-			) {
-				return true;
-			}
-		}
-
-		match call {
-			RuntimeCall::System(
-				frame_system::Call::kill_prefix { .. } | frame_system::Call::set_heap_pages { .. },
-			)
-			| RuntimeCall::Babe(..)
-			| RuntimeCall::Timestamp(..)
-			| RuntimeCall::Indices(..)
-			| RuntimeCall::Balances(..)
-			| RuntimeCall::Crowdloan(
-				crowdloan::Call::create { .. }
-				| crowdloan::Call::contribute { .. }
-				| crowdloan::Call::withdraw { .. }
-				| crowdloan::Call::refund { .. }
-				| crowdloan::Call::dissolve { .. }
-				| crowdloan::Call::edit { .. }
-				| crowdloan::Call::poke { .. }
-				| crowdloan::Call::contribute_all { .. },
-			)
-			| RuntimeCall::Staking(
-				pallet_staking::Call::bond { .. }
-				| pallet_staking::Call::bond_extra { .. }
-				| pallet_staking::Call::unbond { .. }
-				| pallet_staking::Call::withdraw_unbonded { .. }
-				| pallet_staking::Call::validate { .. }
-				| pallet_staking::Call::nominate { .. }
-				| pallet_staking::Call::chill { .. }
-				| pallet_staking::Call::set_payee { .. }
-				| pallet_staking::Call::set_controller { .. }
-				| pallet_staking::Call::set_validator_count { .. }
-				| pallet_staking::Call::increase_validator_count { .. }
-				| pallet_staking::Call::scale_validator_count { .. }
-				| pallet_staking::Call::force_no_eras { .. }
-				| pallet_staking::Call::force_new_era { .. }
-				| pallet_staking::Call::set_invulnerables { .. }
-				| pallet_staking::Call::force_unstake { .. }
-				| pallet_staking::Call::force_new_era_always { .. }
-				| pallet_staking::Call::payout_stakers { .. }
-				| pallet_staking::Call::rebond { .. }
-				| pallet_staking::Call::reap_stash { .. }
-				| pallet_staking::Call::set_staking_configs { .. }
-				| pallet_staking::Call::chill_other { .. }
-				| pallet_staking::Call::force_apply_min_commission { .. },
-			)
-			| RuntimeCall::Session(pallet_session::Call::purge_keys { .. })
-			| RuntimeCall::Grandpa(..)
-			| RuntimeCall::ImOnline(..)
-			| RuntimeCall::Treasury(..)
-			| RuntimeCall::ConvictionVoting(..)
-			| RuntimeCall::Referenda(
-				pallet_referenda::Call::place_decision_deposit { .. }
-				| pallet_referenda::Call::refund_decision_deposit { .. }
-				| pallet_referenda::Call::cancel { .. }
-				| pallet_referenda::Call::kill { .. }
-				| pallet_referenda::Call::nudge_referendum { .. }
-				| pallet_referenda::Call::one_fewer_deciding { .. },
-			)
-			| RuntimeCall::Claims(
-				super::claims::Call::claim { .. }
-				| super::claims::Call::mint_claim { .. }
-				| super::claims::Call::move_claim { .. },
-			)
-			| RuntimeCall::Utility(pallet_utility::Call::as_derivative { .. })
-			| RuntimeCall::Identity(
-				pallet_identity::Call::add_registrar { .. }
-				| pallet_identity::Call::set_identity { .. }
-				| pallet_identity::Call::clear_identity { .. }
-				| pallet_identity::Call::request_judgement { .. }
-				| pallet_identity::Call::cancel_request { .. }
-				| pallet_identity::Call::set_fee { .. }
-				| pallet_identity::Call::set_account_id { .. }
-				| pallet_identity::Call::set_fields { .. }
-				| pallet_identity::Call::provide_judgement { .. }
-				| pallet_identity::Call::kill_identity { .. }
-				| pallet_identity::Call::add_sub { .. }
-				| pallet_identity::Call::rename_sub { .. }
-				| pallet_identity::Call::remove_sub { .. }
-				| pallet_identity::Call::quit_sub { .. },
-			)
-			| RuntimeCall::Vesting(..)
-			| RuntimeCall::Bounties(
-				pallet_bounties::Call::propose_bounty { .. }
-				| pallet_bounties::Call::approve_bounty { .. }
-				| pallet_bounties::Call::propose_curator { .. }
-				| pallet_bounties::Call::unassign_curator { .. }
-				| pallet_bounties::Call::accept_curator { .. }
-				| pallet_bounties::Call::award_bounty { .. }
-				| pallet_bounties::Call::claim_bounty { .. }
-				| pallet_bounties::Call::close_bounty { .. },
-			)
-			| RuntimeCall::ChildBounties(..)
-			| RuntimeCall::ElectionProviderMultiPhase(..)
-			| RuntimeCall::VoterList(..)
-			| RuntimeCall::NominationPools(
-				pallet_nomination_pools::Call::join { .. }
-				| pallet_nomination_pools::Call::bond_extra { .. }
-				| pallet_nomination_pools::Call::claim_payout { .. }
-				| pallet_nomination_pools::Call::unbond { .. }
-				| pallet_nomination_pools::Call::pool_withdraw_unbonded { .. }
-				| pallet_nomination_pools::Call::withdraw_unbonded { .. }
-				| pallet_nomination_pools::Call::create { .. }
-				| pallet_nomination_pools::Call::create_with_pool_id { .. }
-				| pallet_nomination_pools::Call::set_state { .. }
-				| pallet_nomination_pools::Call::set_configs { .. }
-				| pallet_nomination_pools::Call::update_roles { .. }
-				| pallet_nomination_pools::Call::chill { .. },
-			)
-			| RuntimeCall::Hrmp(..)
-			| RuntimeCall::Registrar(
-				paras_registrar::Call::deregister { .. }
-				| paras_registrar::Call::swap { .. }
-				| paras_registrar::Call::remove_lock { .. }
-				| paras_registrar::Call::reserve { .. }
-				| paras_registrar::Call::add_lock { .. },
-			)
-			| RuntimeCall::XcmPallet(pallet_xcm::Call::limited_reserve_transfer_assets {
-				..
-			})
-			| RuntimeCall::Whitelist(pallet_whitelist::Call::whitelist_call { .. })
-			| RuntimeCall::Proxy(..) => true,
-			_ => false,
-		}
-	}
-}
 
 /// Locations that will not be charged fees in the executor, neither for execution nor delivery.
 /// We only waive fees for system functions, which these locations represent.
@@ -340,7 +279,7 @@ pub struct XcmConfig;
 impl xcm_executor::Config for XcmConfig {
 	type RuntimeCall = RuntimeCall;
 	type XcmSender = XcmRouter;
-	type AssetTransactor = LocalAssetTransactor;
+	type AssetTransactor = AssetTransactor;
 	type OriginConverter = LocalOriginConverter;
 	// Polkadot Relay recognises no chains which act as reserves.
 	type IsReserve = ();
@@ -353,8 +292,7 @@ impl xcm_executor::Config for XcmConfig {
 		MaxInstructions,
 	>;
 	// The weight trader piggybacks on the existing transaction-fee conversion logic.
-	type Trader =
-		UsingComponents<WeightToFee, TokenLocation, AccountId, Balances, ToAuthor<Runtime>>;
+	type Trader = FreeForAll;
 	type ResponseHandler = XcmPallet;
 	type AssetTrap = XcmPallet;
 	type AssetLocker = ();

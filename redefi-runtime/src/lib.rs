@@ -34,9 +34,9 @@ use frame_support::{
 	genesis_builder_helper::{build_config, create_default_config},
 	parameter_types,
 	traits::{
-		fungible::HoldConsideration, ConstU32, EitherOf, EitherOfDiverse, Get, InstanceFilter,
-		KeyOwnerProofSystem, LinearStoragePrice, OnFinalize as _, PrivilegeCmp, ProcessMessage,
-		ProcessMessageError, WithdrawReasons,
+		fungible::HoldConsideration, ConstU32, Contains, EitherOf, EitherOfDiverse, Get,
+		InstanceFilter, KeyOwnerProofSystem, LinearStoragePrice, OnFinalize as _, PrivilegeCmp,
+		ProcessMessage, ProcessMessageError, WithdrawReasons,
 	},
 	weights::{ConstantMultiplier, WeightMeter},
 	PalletId,
@@ -104,15 +104,21 @@ use sp_runtime::{
 	ApplyExtrinsicResult, FixedU128, KeyTypeId, Perbill, Percent, Permill, RuntimeDebug,
 };
 use sp_staking::SessionIndex;
-use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, prelude::*};
+use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, marker::PhantomData, prelude::*};
 #[cfg(any(feature = "std", test))]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 use xcm::{
-	latest::{InteriorMultiLocation, Junction, Junction::PalletInstance},
+	latest::{
+		InteriorMultiLocation, Junction, Junction::PalletInstance, MultiLocation as Location,
+	},
 	VersionedMultiLocation,
 };
-use xcm_builder::PayOverXcm;
+use xcm_builder::{AccountKey20Aliases, FungiblesAdapter, NoChecking, PayOverXcm};
+use xcm_executor::{
+	traits::{ConvertLocation, WeightTrader},
+	Assets,
+};
 // Weights used in the runtime.
 mod weights;
 
@@ -126,6 +132,8 @@ use governance::{
 };
 
 pub mod ethereum;
+pub mod safe_call_filter;
+pub use safe_call_filter::*;
 pub mod xcm_config;
 
 pub const LOG_TARGET: &str = "runtime::polkadot";
@@ -141,7 +149,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_027,
+	spec_version: 1_003_0_030,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,

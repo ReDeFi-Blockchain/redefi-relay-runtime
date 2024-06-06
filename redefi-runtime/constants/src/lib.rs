@@ -126,6 +126,8 @@ pub mod system_parachain {
 	pub const COLLECTIVES_ID: u32 = 1001;
 	/// Bridge Hub parachain ID.
 	pub const BRIDGE_HUB_ID: u32 = 1002;
+	/// Layer 2 parachain ID.
+	pub const RED_ID: u32 = 2001;
 
 	frame_support::match_types! {
 		// System parachains from Polkadot point of view.

@@ -8,7 +8,7 @@ use frame_support::{
 };
 use pallet_ethereum::PostLogContent;
 use pallet_evm::{EnsureAddressTruncated, HashedAddressMapping};
-use polkadot_runtime_constants::TOKEN_SYMBOL;
+use polkadot_runtime_constants::{system_parachain::RED_ID, TOKEN_SYMBOL};
 use sp_runtime::{traits::ConstU32, Perbill, RuntimeAppPublic};
 
 use crate::*;
@@ -131,8 +131,19 @@ parameter_types! {
 	pub Prefix: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
 	pub StringLimit: u32 = 32;
 }
+
+#[cfg(not(feature = "testnet-id"))]
+pub const RED_CHAIN_ID: u64 = 1899;
+
+#[cfg(feature = "testnet-id")]
+pub const RED_CHAIN_ID: u64 = 11899;
+
+parameter_types! {
+	pub ChainLocator: BTreeMap<u64, Location> = BTreeMap::from([(RED_CHAIN_ID, Junction::Parachain(RED_ID).into_location())]);
+}
+
 impl pallet_evm_assets::Config for Runtime {
 	type AddressPrefix = Prefix;
-
 	type StringLimit = StringLimit;
+	type ChainLocator = ChainLocator;
 }
