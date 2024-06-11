@@ -28,7 +28,7 @@ pub(crate) type ChainId = u64;
 
 pub(crate) const CURRENCY: Balance = 1_000_000;
 pub(crate) const NATIVE: Balance = 1_000_000_000_000_000_000;
-pub(crate) const BALANCE: Balance = 10_000;
+pub(crate) const BALANCE: Balance = 100_000_000;
 
 pub(crate) const GBP_ID: AssetId = 0xBABB0000_00000000_00000000_00000010;
 pub(crate) const RED_ID: AssetId = 0xBABB0000_00000000_00000000_00000000;
