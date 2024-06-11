@@ -18,7 +18,7 @@
 
 use frame_support::{
 	match_types, parameter_types,
-	traits::{Contains, ContainsPair, Equals, Everything, Nothing},
+	traits::{ContainsPair, Equals, Everything, Nothing},
 	weights::Weight,
 };
 use frame_system::EnsureRoot;
@@ -28,21 +28,16 @@ use polkadot_runtime_constants::{
 	system_parachain::*,
 	xcm::body::{FELLOWSHIP_ADMIN_INDEX, TREASURER_INDEX},
 };
-use runtime_common::{
-	crowdloan, paras_registrar,
-	xcm_sender::{ChildParachainRouter, ExponentialPrice},
-	ToAuthor,
-};
+use runtime_common::xcm_sender::{ChildParachainRouter, ExponentialPrice};
 use sp_core::ConstU32;
 use xcm::latest::{prelude::*, Fungibility};
 use xcm_builder::{
-	AccountId32Aliases, AllowExplicitUnpaidExecutionFrom, AllowKnownQueryResponses,
-	AllowSubscriptionsFrom, AllowTopLevelPaidExecutionFrom, ChildParachainAsNative,
-	ChildParachainConvertsVia, CurrencyAdapter as XcmCurrencyAdapter, DescribeAllTerminal,
-	DescribeFamily, HashedDescription, IsConcrete, MintLocation, OriginToPluralityVoice,
-	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
-	TrailingSetTopicAsId, UsingComponents, WeightInfoBounds, WithComputedOrigin, WithUniqueTopic,
-	XcmFeesToAccount,
+	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
+	AllowTopLevelPaidExecutionFrom, ChildParachainAsNative, ChildParachainConvertsVia,
+	CurrencyAdapter as XcmCurrencyAdapter, DescribeAllTerminal, DescribeFamily, HashedDescription,
+	IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
+	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, TrailingSetTopicAsId,
+	WeightInfoBounds, WithComputedOrigin, WithUniqueTopic, XcmFeesToAccount,
 };
 use xcm_executor::traits::WithOriginFilter;
 
@@ -73,11 +68,13 @@ pub type SovereignAccountOf = (
 	ChildParachainConvertsVia<ParaId, AccountId>,
 	// We can directly alias an `AccountId32` into a local account.
 	AccountId32Aliases<ThisNetwork, AccountId>,
+	// We map evm locations to Substrate mirror
+	CrossAccountLocationMapperToSubstrate<AccountKey20Aliases<ThisNetwork, H160>, Runtime>,
 	// Foreign locations alias into accounts according to a hash of their standard description.
 	HashedDescription<AccountId, DescribeFamily<DescribeAllTerminal>>,
 );
 
-pub struct CrossAccountLocationMapper<LocationConverter, Runtime>(
+pub struct CrossAccountLocationMapperToEth<LocationConverter, Runtime>(
 	PhantomData<(LocationConverter, Runtime)>,
 )
 where
@@ -85,7 +82,7 @@ where
 	LocationConverter: ConvertLocation<<Runtime as frame_system::Config>::AccountId>;
 
 impl<Runtime, LocationConverter> ConvertLocation<H160>
-	for CrossAccountLocationMapper<LocationConverter, Runtime>
+	for CrossAccountLocationMapperToEth<LocationConverter, Runtime>
 where
 	Runtime: pallet_evm::Config,
 	LocationConverter: ConvertLocation<<Runtime as frame_system::Config>::AccountId>,
@@ -97,12 +94,34 @@ where
 	}
 }
 
+pub struct CrossAccountLocationMapperToSubstrate<LocationConverter, Runtime>(
+	PhantomData<(LocationConverter, Runtime)>,
+)
+where
+	Runtime: pallet_evm::Config,
+	LocationConverter: ConvertLocation<H160>;
+
+impl<Runtime, LocationConverter> ConvertLocation<Runtime::AccountId>
+	for CrossAccountLocationMapperToSubstrate<LocationConverter, Runtime>
+where
+	Runtime: pallet_evm::Config,
+	LocationConverter: ConvertLocation<H160>,
+{
+	fn convert_location(location: &Location) -> Option<Runtime::AccountId> {
+		LocationConverter::convert_location(location).map(|account| {
+			<Runtime as pallet_evm::Config>::CrossAccountId::from_eth(account)
+				.as_sub()
+				.clone()
+		})
+	}
+}
+
 /// Type for specifying how a `Location` can be converted into an `AccountId`. This is used
 /// when determining ownership of accounts for asset transacting and when attempting to use XCM
 /// `Transact` in order to determine the dispatch Origin.
 pub type LocationToAccountId20 = (
 	// The Parachain origin converts to the `AccountId20`.
-	CrossAccountLocationMapper<ChildParachainConvertsVia<ParaId, AccountId>, Runtime>,
+	CrossAccountLocationMapperToEth<ChildParachainConvertsVia<ParaId, AccountId>, Runtime>,
 	AccountKey20Aliases<ThisNetwork, H160>,
 );
 
@@ -242,10 +261,7 @@ match_types! {
 	pub type OnlyParachains: impl Contains<MultiLocation> = {
 		MultiLocation { parents: 0, interior: X1(Parachain(_)) }
 	};
-	// pub type CollectivesOrFellows: impl Contains<MultiLocation> = {
-	// 	MultiLocation { parents: 0, interior: X1(Parachain(COLLECTIVES_ID)) } |
-	// 	MultiLocation { parents: 0, interior: X2(Parachain(COLLECTIVES_ID), Plurality { id: BodyId::Technical, .. }) }
-	// };
+
 	pub type LocalPlurality: impl Contains<MultiLocation> = {
 		MultiLocation { parents: 0, interior: X1(Plurality { .. }) }
 	};
@@ -336,6 +352,8 @@ pub type LocalOriginToLocation = (
 	GeneralAdminToPlurality,
 	// And a usual Signed origin to be used in XCM as a corresponding AccountId32
 	SignedToAccountId32<RuntimeOrigin, AccountId, ThisNetwork>,
+	// For Evm precompiles support.
+	pallet_evm_assets::xcm::EthereumOriginToLocation<RuntimeOrigin, ThisNetwork>,
 );
 
 /// Type to convert the `StakingAdmin` origin to a Plurality `MultiLocation` value.

@@ -23,12 +23,14 @@ use pallet_xcm_benchmarks_generic::WeightInfo as XcmGeneric;
 use sp_std::prelude::*;
 use xcm::{latest::prelude::*, DoubleEncoded};
 
-use crate::Runtime;
+use crate::{ethereum::Prefix, xcm_config::ThisNetwork, Runtime};
 
 /// Types of asset supported by the Polkadot runtime.
 pub enum AssetTypes {
 	/// An asset backed by `pallet-balances`.
 	Balances,
+	/// An asset from EVM precompiles.
+	EvmAssets,
 	/// Unknown asset.
 	Unknown,
 }
@@ -43,6 +45,18 @@ impl From<&MultiAsset> for AssetTypes {
 				}),
 				..
 			} => AssetTypes::Balances,
+
+			MultiAsset {
+				id:
+					Concrete(MultiLocation {
+						parents: 0,
+						interior: Junctions::X1(Junction::AccountKey20 { network, key }),
+					}),
+				..
+			} if key.starts_with(&Prefix::get()) && *network == Some(ThisNetwork::get()) => {
+				AssetTypes::EvmAssets
+			}
+
 			_ => AssetTypes::Unknown,
 		}
 	}
@@ -60,10 +74,10 @@ impl WeighMultiAssets for MultiAssetFilter {
 		match self {
 			Self::Definite(assets) => assets
 				.inner()
-				.into_iter()
+				.iter()
 				.map(From::from)
 				.map(|t| match t {
-					AssetTypes::Balances => balances_weight,
+					AssetTypes::Balances | AssetTypes::EvmAssets => balances_weight,
 					AssetTypes::Unknown => Weight::MAX,
 				})
 				.fold(Weight::zero(), |acc, x| acc.saturating_add(x)),
@@ -81,10 +95,10 @@ impl WeighMultiAssets for MultiAssetFilter {
 impl WeighMultiAssets for MultiAssets {
 	fn weigh_multi_assets(&self, balances_weight: Weight) -> Weight {
 		self.inner()
-			.into_iter()
+			.iter()
 			.map(|m| <AssetTypes as From<&MultiAsset>>::from(m))
 			.map(|t| match t {
-				AssetTypes::Balances => balances_weight,
+				AssetTypes::Balances | AssetTypes::EvmAssets => balances_weight,
 				AssetTypes::Unknown => Weight::MAX,
 			})
 			.fold(Weight::zero(), |acc, x| acc.saturating_add(x))
