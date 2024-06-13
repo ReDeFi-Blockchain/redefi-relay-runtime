@@ -134,6 +134,7 @@ use governance::{
 pub mod ethereum;
 pub mod safe_call_filter;
 pub use safe_call_filter::*;
+pub(crate) mod fungible_adapter;
 pub mod xcm_config;
 
 pub const LOG_TARGET: &str = "runtime::polkadot";

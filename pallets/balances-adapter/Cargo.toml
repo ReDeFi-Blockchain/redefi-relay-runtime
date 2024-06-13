@@ -21,6 +21,12 @@ scale-info = { workspace = true }
 evm-coder = { workspace = true }
 pallet-evm = { workspace = true }
 
+# XCM
+pallet-ethereum = { workspace = true }
+pallet-xcm = { workspace = true }
+xcm = { workspace = true }
+xcm-executor = { workspace = true }
+
 #Local
 pallet-evm-coder-substrate = { workspace = true }
 
@@ -31,10 +37,14 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"pallet-balances/std",
+	"pallet-ethereum/std",
+	"pallet-xcm/std",
 	"pallet-evm-coder-substrate/std",
 	"pallet-evm/std",
 	"sp-core/std",
 	"sp-std/std",
+	"xcm-executor/std",
+	"xcm/std",
 ]
 stubgen = ["evm-coder/stubgen"]
 try-runtime = ["frame-support/try-runtime"]

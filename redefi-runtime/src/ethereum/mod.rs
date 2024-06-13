@@ -117,21 +117,6 @@ parameter_types! {
 		0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBA, 0xBB,
 	]);
 }
-impl pallet_balances_adapter::Config for Runtime {
-	type Balances = Balances;
-	type NativeBalance = Balance;
-	type ContractAddress = AdapterContractAddress;
-	type Decimals = Decimals;
-	type Name = Name;
-	type Symbol = Symbol;
-	type WeightInfo = pallet_balances::weights::SubstrateWeight<Self>;
-}
-
-parameter_types! {
-	pub Prefix: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
-	pub StringLimit: u32 = 32;
-}
-
 #[cfg(not(feature = "testnet-id"))]
 pub const RED_CHAIN_ID: u64 = 1899;
 
@@ -140,6 +125,22 @@ pub const RED_CHAIN_ID: u64 = 11899;
 
 parameter_types! {
 	pub ChainLocator: BTreeMap<u64, Location> = BTreeMap::from([(RED_CHAIN_ID, Junction::Parachain(RED_ID).into_location())]);
+}
+
+impl pallet_balances_adapter::Config for Runtime {
+	type Balances = Balances;
+	type NativeBalance = Balance;
+	type ContractAddress = AdapterContractAddress;
+	type Decimals = Decimals;
+	type Name = Name;
+	type Symbol = Symbol;
+	type WeightInfo = pallet_balances::weights::SubstrateWeight<Self>;
+	type ChainLocator = ChainLocator;
+}
+
+parameter_types! {
+	pub Prefix: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
+	pub StringLimit: u32 = 32;
 }
 
 impl pallet_evm_assets::Config for Runtime {

@@ -41,6 +41,7 @@ use xcm_builder::{
 };
 use xcm_executor::traits::WithOriginFilter;
 
+use self::{ethereum::AdapterContractAddress, fungible_adapter::FungibleAdapter};
 use super::*;
 
 parameter_types! {
@@ -59,6 +60,7 @@ parameter_types! {
 	pub LocalCheckAccount: (AccountId, MintLocation) = (CheckAccount::get(), MintLocation::Local);
 	/// Account of the treasury pallet.
 	pub TreasuryAccount: AccountId = Treasury::account_id();
+	pub NativeAssetXcmEvmLocation: Location = Location::new(0, Junction::AccountKey20 { network: Some(ThisNetwork::get()), key: AdapterContractAddress::get().into() });
 }
 
 /// The canonical means of converting a `MultiLocation` into an `AccountId`, used when we want to
@@ -119,14 +121,14 @@ where
 /// Type for specifying how a `Location` can be converted into an `AccountId`. This is used
 /// when determining ownership of accounts for asset transacting and when attempting to use XCM
 /// `Transact` in order to determine the dispatch Origin.
-pub type LocationToAccountId20 = (
+pub type EvmAssetsLocationToAccountId20 = (
 	// The Parachain origin converts to the `AccountId20`.
 	CrossAccountLocationMapperToEth<ChildParachainConvertsVia<ParaId, AccountId>, Runtime>,
 	AccountKey20Aliases<ThisNetwork, H160>,
 );
 
 pub type EvmAssetsTransactor =
-	FungiblesAdapter<EvmAssets, EvmAssets, LocationToAccountId20, H160, NoChecking, ()>;
+	FungiblesAdapter<EvmAssets, EvmAssets, EvmAssetsLocationToAccountId20, H160, NoChecking, ()>;
 
 /// Our asset transactor. This is what allows us to interact with the runtime assets from the point
 /// of view of XCM-only concepts like `MultiLocation` and `MultiAsset`.
@@ -145,7 +147,24 @@ pub type LocalAssetTransactor = XcmCurrencyAdapter<
 	LocalCheckAccount,
 >;
 
-pub type AssetTransactor = (EvmAssetsTransactor, LocalAssetTransactor);
+pub type EvmLocalAssetTransactor = FungibleAdapter<
+	// Use this currency:
+	BalancesAdapter,
+	// Use this currency when it is a fungible asset matching the given location or name:
+	IsConcrete<NativeAssetXcmEvmLocation>,
+	// Do a simple punn to convert an AccountId32 Location into a native chain account ID:
+	EvmAssetsLocationToAccountId20,
+	// Our chain's account ID type (we can't get away without mentioning it explicitly):
+	H160,
+	// We don't track any teleports.
+	(),
+>;
+
+pub type AssetTransactor = (
+	EvmLocalAssetTransactor,
+	EvmAssetsTransactor,
+	LocalAssetTransactor,
+);
 
 /// The means that we convert an XCM origin `MultiLocation` into the runtime's `Origin` type for
 /// local dispatch. This is a conversion function from an `OriginKind` type along with the
