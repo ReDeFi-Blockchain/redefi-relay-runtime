@@ -28,7 +28,8 @@ use polkadot_runtime_constants::{
 	system_parachain::*,
 	xcm::body::{FELLOWSHIP_ADMIN_INDEX, TREASURER_INDEX},
 };
-use runtime_common::xcm_sender::{ChildParachainRouter, ExponentialPrice};
+use runtime_common::xcm_sender::{ChildParachainRouter, NoPriceForMessageDelivery};
+use runtime_parachains::FeeTracker;
 use sp_core::ConstU32;
 use xcm::latest::{prelude::*, Fungibility};
 use xcm_builder::{
@@ -195,8 +196,7 @@ parameter_types! {
 	pub const BaseDeliveryFee: u128 = CENTS.saturating_mul(3);
 }
 
-pub type PriceForChildParachainDelivery =
-	ExponentialPrice<FeeAssetId, BaseDeliveryFee, TransactionByteFee, Dmp>;
+pub type PriceForChildParachainDelivery = NoPriceForMessageDelivery<<Dmp as FeeTracker>::Id>;
 
 /// The XCM router. When we want to send an XCM message, we use this type. It amalgamates all of our
 /// individual routers.
