@@ -20,6 +20,11 @@ sp-std = { workspace = true }
 parity-scale-codec = { workspace = true }
 scale-info = { workspace = true }
 
+# XCM
+pallet-ethereum = { workspace = true }
+pallet-xcm = { workspace = true }
+xcm = { workspace = true }
+xcm-executor = { workspace = true }
 # Redefi
 evm-coder = { workspace = true }
 pallet-evm = { workspace = true }
@@ -38,11 +43,15 @@ std = [
 	"frame-support/std",
 	"frame-system/std",
 	"pallet-balances/std",
+	"pallet-ethereum/std",
 	"pallet-evm-coder-substrate/std",
 	"pallet-evm/std",
+	"xcm/std",
 	"sp-core/std",
 	"sp-io/std",
 	"sp-std/std",
+	"xcm-executor/std",
+	"xcm/std",
 ]
 stubgen = ["evm-coder/stubgen"]
 try-runtime = ["frame-support/try-runtime"]

@@ -2,13 +2,13 @@ use core::marker::PhantomData;
 
 use frame_support::{
 	parameter_types,
-	traits::FindAuthor,
+	traits::{Currency, FindAuthor, Imbalance, OnUnbalanced},
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 	ConsensusEngineId,
 };
 use pallet_ethereum::PostLogContent;
-use pallet_evm::{EnsureAddressTruncated, HashedAddressMapping};
-use polkadot_runtime_constants::TOKEN_SYMBOL;
+use pallet_evm::{EVMCurrencyAdapter, EnsureAddressTruncated, HashedAddressMapping};
+use polkadot_runtime_constants::{system_parachain::RED_ID, TOKEN_SYMBOL};
 use sp_runtime::{traits::ConstU32, Perbill, RuntimeAppPublic};
 
 use crate::*;
@@ -64,6 +64,24 @@ impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 		(MIN_GAS_PRICE.into(), T::DbWeight::get().reads(1))
 	}
 }
+
+type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
+
+pub struct DealWithFees;
+impl OnUnbalanced<NegativeImbalance> for DealWithFees {
+	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
+		if let Some(fees) = fees_then_tips.next() {
+			// for fees, 100% to treasury
+			let mut split = fees.ration(100, 0);
+			if let Some(tips) = fees_then_tips.next() {
+				// for tips, if any, 100% to treasury
+				tips.ration_merge_into(100, 0, &mut split);
+			}
+			Treasury::on_unbalanced(split.0);
+		}
+	}
+}
+
 impl pallet_evm::Config for Runtime {
 	type CrossAccountId = CrossAccountId;
 	type AddressMapping = HashedAddressMapping<Self::Hashing>;
@@ -86,7 +104,7 @@ impl pallet_evm::Config for Runtime {
 	type OnCreate = ();
 	type ChainId = ChainId;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type OnChargeTransaction = ();
+	type OnChargeTransaction = EVMCurrencyAdapter<Balances, DealWithFees>;
 	type FindAuthor = EthereumFindAuthor<Babe>;
 	type Timestamp = crate::Timestamp;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
@@ -117,6 +135,16 @@ parameter_types! {
 		0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xBA, 0xBB,
 	]);
 }
+#[cfg(not(feature = "testnet-id"))]
+pub const RED_CHAIN_ID: u64 = 1899;
+
+#[cfg(feature = "testnet-id")]
+pub const RED_CHAIN_ID: u64 = 11899;
+
+parameter_types! {
+	pub ChainLocator: BTreeMap<u64, Location> = BTreeMap::from([(RED_CHAIN_ID, Junction::Parachain(RED_ID).into_location())]);
+}
+
 impl pallet_balances_adapter::Config for Runtime {
 	type Balances = Balances;
 	type NativeBalance = Balance;
@@ -125,14 +153,16 @@ impl pallet_balances_adapter::Config for Runtime {
 	type Name = Name;
 	type Symbol = Symbol;
 	type WeightInfo = pallet_balances::weights::SubstrateWeight<Self>;
+	type ChainLocator = ChainLocator;
 }
 
 parameter_types! {
 	pub Prefix: [u8; 4] = [0xFF, 0xFF, 0xFF, 0xFF];
 	pub StringLimit: u32 = 32;
 }
+
 impl pallet_evm_assets::Config for Runtime {
 	type AddressPrefix = Prefix;
-
 	type StringLimit = StringLimit;
+	type ChainLocator = ChainLocator;
 }
