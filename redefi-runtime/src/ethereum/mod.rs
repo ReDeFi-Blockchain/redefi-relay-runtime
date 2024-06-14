@@ -2,12 +2,12 @@ use core::marker::PhantomData;
 
 use frame_support::{
 	parameter_types,
-	traits::FindAuthor,
+	traits::{Currency, FindAuthor, Imbalance, OnUnbalanced},
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 	ConsensusEngineId,
 };
 use pallet_ethereum::PostLogContent;
-use pallet_evm::{EnsureAddressTruncated, HashedAddressMapping};
+use pallet_evm::{EVMCurrencyAdapter, EnsureAddressTruncated, HashedAddressMapping};
 use polkadot_runtime_constants::{system_parachain::RED_ID, TOKEN_SYMBOL};
 use sp_runtime::{traits::ConstU32, Perbill, RuntimeAppPublic};
 
@@ -64,6 +64,24 @@ impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 		(MIN_GAS_PRICE.into(), T::DbWeight::get().reads(1))
 	}
 }
+
+type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
+
+pub struct DealWithFees;
+impl OnUnbalanced<NegativeImbalance> for DealWithFees {
+	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
+		if let Some(fees) = fees_then_tips.next() {
+			// for fees, 100% to treasury
+			let mut split = fees.ration(100, 0);
+			if let Some(tips) = fees_then_tips.next() {
+				// for tips, if any, 100% to treasury
+				tips.ration_merge_into(100, 0, &mut split);
+			}
+			Treasury::on_unbalanced(split.0);
+		}
+	}
+}
+
 impl pallet_evm::Config for Runtime {
 	type CrossAccountId = CrossAccountId;
 	type AddressMapping = HashedAddressMapping<Self::Hashing>;
@@ -86,7 +104,7 @@ impl pallet_evm::Config for Runtime {
 	type OnCreate = ();
 	type ChainId = ChainId;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type OnChargeTransaction = ();
+	type OnChargeTransaction = EVMCurrencyAdapter<Balances, DealWithFees>;
 	type FindAuthor = EthereumFindAuthor<Babe>;
 	type Timestamp = crate::Timestamp;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
