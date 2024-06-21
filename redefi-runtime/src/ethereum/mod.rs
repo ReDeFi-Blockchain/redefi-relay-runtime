@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use frame_support::{
 	parameter_types,
-	traits::{Currency, FindAuthor, Imbalance, OnUnbalanced},
+	traits::FindAuthor,
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 	ConsensusEngineId,
 };
@@ -65,22 +65,7 @@ impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 	}
 }
 
-type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
-
-pub struct DealWithFees;
-impl OnUnbalanced<NegativeImbalance> for DealWithFees {
-	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
-		if let Some(fees) = fees_then_tips.next() {
-			// for fees, 100% to treasury
-			let mut split = fees.ration(100, 0);
-			if let Some(tips) = fees_then_tips.next() {
-				// for tips, if any, 100% to treasury
-				tips.ration_merge_into(100, 0, &mut split);
-			}
-			Treasury::on_unbalanced(split.0);
-		}
-	}
-}
+pub type DealWithFees = Treasury;
 
 impl pallet_evm::Config for Runtime {
 	type CrossAccountId = CrossAccountId;
