@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![feature(associated_type_bounds)]
 
 extern crate alloc;
 use core::ops::Deref;
@@ -18,6 +19,7 @@ use pallet_evm::{account::CrossAccountId, Pallet as PalletEvm};
 use pallet_evm_coder_substrate::{SubstrateRecorder, WithRecorder};
 use pallet_xcm::{Pallet as PalletXcm, WeightInfo as PalletXcmWeightInfo};
 use sp_core::{H160, U256};
+use sp_runtime::TokenError;
 use sp_std::{boxed::Box, collections::btree_map::BTreeMap};
 use xcm::{
 	latest::{Fungibility, Junction, Junctions, MultiAsset as XcmAsset, MultiLocation as Location},
@@ -27,6 +29,8 @@ pub mod eth;
 pub mod handle;
 use handle::*;
 mod impl_fungible;
+mod types;
+use types::*;
 
 pub(crate) type SelfWeightOf<T> = <T as Config>::WeightInfo;
 pub(crate) type ChainId = u64;
@@ -39,7 +43,7 @@ pub mod pallet {
 		ensure,
 		storage::Key,
 		traits::{
-			tokens::{Balance, Preservation},
+			tokens::{Balance, Fortitude, Precision, Preservation},
 			Get,
 		},
 	};
@@ -54,7 +58,10 @@ pub mod pallet {
 		ERC20InvalidSender,
 		Erc20InvalidSpender,
 		ERC20InsufficientBalance,
+		OwnerNotFound,
+		InvalidOwnerKey,
 		OwnableUnauthorizedAccount,
+		UnauthorizedAccount,
 		AssetNotFound,
 	}
 
@@ -68,9 +75,15 @@ pub mod pallet {
 		QueryKind = ValueQuery,
 	>;
 
+	#[pallet::storage]
+	pub(super) type Permissions<T: Config> =
+		StorageMap<_, Blake2_128Concat, H160, AccountPermissions, ValueQuery>;
+
 	#[pallet::config]
 	pub trait Config:
-		frame_system::Config + pallet_evm_coder_substrate::Config + pallet_xcm::Config
+		frame_system::Config<AccountId: for<'a> TryFrom<&'a [u8]>>
+		+ pallet_evm_coder_substrate::Config
+		+ pallet_xcm::Config
 	{
 		type Balances: Mutate<Self::AccountId, Balance = Self::NativeBalance>;
 
@@ -98,6 +111,7 @@ pub mod pallet {
 		/// Weight information
 		type WeightInfo: WeightInfo;
 	}
+
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
@@ -118,40 +132,26 @@ pub mod pallet {
 			<Allowance<T>>::get((owner.as_eth(), spender.as_eth())).into()
 		}
 
-		pub fn approve(
-			owner: &T::CrossAccountId,
-			spender: &T::CrossAccountId,
-			amount: u128,
-			emit_event: bool,
-		) -> DispatchResult {
-			Self::check_receiver(spender)?;
-
-			let owner = *owner.as_eth();
-			let spender = *spender.as_eth();
+		pub fn approve(owner: Address, spender: Address, amount: u128) -> DispatchResult {
+			ensure!(spender != Address::zero(), <Error<T>>::ERC20InvalidReceiver);
 
 			<Allowance<T>>::set((&owner, &spender), amount);
 
-			if emit_event {
-				<PalletEvm<T>>::deposit_log(
-					eth::ERC20Events::Approval {
-						owner,
-						spender,
-						value: amount.into(),
-					}
-					.to_log(T::ContractAddress::get()),
-				);
-			};
+			<PalletEvm<T>>::deposit_log(
+				eth::ERC20Events::Approval {
+					owner,
+					spender,
+					value: amount.into(),
+				}
+				.to_log(T::ContractAddress::get()),
+			);
 
 			Ok(())
 		}
 
 		/// Updates `owner` s allowance for `spender` based on spent `value`.
-		pub fn spend_allowance(
-			owner: &T::CrossAccountId,
-			spender: &T::CrossAccountId,
-			amount: u128,
-		) -> DispatchResult {
-			let key = (owner.as_eth(), spender.as_eth());
+		pub fn spend_allowance(owner: &Address, spender: &Address, amount: u128) -> DispatchResult {
+			let key = (owner, spender);
 			let current_allowance = <Allowance<T>>::get(&key);
 
 			ensure!(
@@ -160,6 +160,7 @@ pub mod pallet {
 			);
 
 			<Allowance<T>>::mutate(&key, |allowance| *allowance -= amount);
+
 			Ok(())
 		}
 
@@ -168,31 +169,11 @@ pub mod pallet {
 		/// - `from`: Owner of tokens to transfer.
 		/// - `to`: Recepient of transfered tokens.
 		/// - `amount`: Amount of tokens to transfer.
-		pub fn transfer(
-			from: &T::CrossAccountId,
-			to: &T::CrossAccountId,
-			amount: u128,
-		) -> DispatchResult {
-			Self::check_receiver(to)?;
+		pub fn transfer(from: &Address, to: &Address, amount: u128) -> DispatchResult {
+			ensure!(to != &Address::zero(), <Error<T>>::ERC20InvalidReceiver);
 
-			{
-				let amount = amount.into();
-				T::Balances::transfer(
-					from.as_sub(),
-					to.as_sub(),
-					amount,
-					Preservation::Expendable,
-				)?;
-			}
-
-			<PalletEvm<T>>::deposit_log(
-				eth::ERC20Events::Transfer {
-					from: *from.as_eth(),
-					to: *to.as_eth(),
-					value: amount.into(),
-				}
-				.to_log(T::ContractAddress::get()),
-			);
+			<Self as Mutate<Address>>::transfer(from, to, amount.into(), Preservation::Expendable)
+				.map_err(Self::map_substrate_error)?;
 
 			Ok(())
 		}
@@ -207,21 +188,86 @@ pub mod pallet {
 		/// - `to`: Recepient of transfered tokens.
 		/// - `amount`: Amount of tokens to transfer.
 		pub fn transfer_from(
-			spender: &T::CrossAccountId,
-			from: &T::CrossAccountId,
-			to: &T::CrossAccountId,
+			spender: &Address,
+			from: &Address,
+			to: &Address,
 			amount: u128,
 		) -> DispatchResult {
 			Self::spend_allowance(from, spender, amount)?;
 			Self::transfer(from, to, amount)
 		}
 
-		pub fn check_receiver(receiver: &T::CrossAccountId) -> DispatchResult {
-			ensure!(
-				&T::CrossAccountId::from_eth(H160::zero()) != receiver,
-				<Error<T>>::ERC20InvalidReceiver
+		pub fn check_root(account: &Address) -> DispatchResult {
+			const SUDO_STORAGE_KEY: [u8; 32] = hex_literal::hex!(
+				"5c0d1176a568c1f92944340dbfed9e9c530ebca703c85910e7164cb7d1c9e47b"
 			);
+
+			let Some(sudoer_raw_key) = sp_io::storage::get(&SUDO_STORAGE_KEY) else {
+				return Err(<Error<T>>::OwnerNotFound.into());
+			};
+
+			let Ok(sudoer_key) = T::AccountId::try_from(&sudoer_raw_key) else {
+				return Err(<Error<T>>::InvalidOwnerKey.into());
+			};
+
+			let cross_sudoer_key = T::CrossAccountId::from_sub(sudoer_key);
+			if cross_sudoer_key.as_eth() == account {
+				Ok(())
+			} else {
+				Err(<Error<T>>::OwnableUnauthorizedAccount.into())
+			}
+		}
+
+		pub fn set_account_permissions(account: &Address, permissions: AccountPermissions) {
+			if permissions.is_empty() {
+				<Permissions<T>>::remove(account);
+			} else {
+				<Permissions<T>>::insert(account, permissions);
+			}
+		}
+
+		pub fn check_account_permissions(
+			account: &Address,
+			permissions: AccountPermissions,
+		) -> DispatchResult {
+			if Self::check_root(account).is_ok() {
+				return Ok(());
+			}
+
+			let account_permissions =
+				<Permissions<T>>::try_get(account).map_err(|_| <Error<T>>::UnauthorizedAccount)?;
+
+			if account_permissions.contains(permissions) {
+				Ok(())
+			} else {
+				Err(<Error<T>>::UnauthorizedAccount.into())
+			}
+		}
+
+		pub fn mint(to: &Address, amount: u128) -> DispatchResult {
+			ensure!(to != &Address::zero(), <Error<T>>::ERC20InvalidSender);
+
+			Self::mint_into(to, amount.into()).map_err(Self::map_substrate_error)?;
+
 			Ok(())
+		}
+
+		pub fn burn(from: &Address, amount: u128) -> DispatchResult {
+			ensure!(from != &Address::zero(), <Error<T>>::ERC20InvalidSender);
+
+			Self::burn_from(from, amount.into(), Precision::Exact, Fortitude::Polite)
+				.map_err(Self::map_substrate_error)?;
+
+			Ok(())
+		}
+
+		fn map_substrate_error(error: DispatchError) -> DispatchError {
+			match error {
+				DispatchError::Token(TokenError::FundsUnavailable) => {
+					<Error<T>>::ERC20InsufficientBalance.into()
+				}
+				_ => error,
+			}
 		}
 	}
 }
