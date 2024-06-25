@@ -186,6 +186,38 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
+	pub fn set_account_permissions(
+		asset: &AssetId,
+		account: &Address,
+		permissions: AccountPermissions,
+	) {
+		if permissions.is_empty() {
+			<Permissions<T>>::remove(asset, account);
+		} else {
+			<Permissions<T>>::insert(asset, account, permissions);
+		}
+	}
+
+	pub fn check_account_permissions(
+		asset: &AssetId,
+		account: &Address,
+		permissions: AccountPermissions,
+	) -> DispatchResult {
+		let asset_details = <Asset<T>>::get(asset).ok_or(<Error<T>>::AssetNotFound)?;
+		if &asset_details.owner == account {
+			return Ok(());
+		}
+
+		let account_permissions = <Permissions<T>>::try_get(asset, account)
+			.map_err(|_| <Error<T>>::UnauthorizedAccount)?;
+
+		if account_permissions.contains(permissions) {
+			Ok(())
+		} else {
+			Err(<Error<T>>::UnauthorizedAccount.into())
+		}
+	}
+
 	pub fn mint(asset: &AssetId, to: &Address, amount: Balance) -> DispatchResult {
 		Self::check_receiver(to)?;
 		Self::update(asset, &Address::zero(), to, amount)
