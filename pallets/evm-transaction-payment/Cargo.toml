@@ -1,0 +1,32 @@
+[package]
+edition = "2021"
+license = "GPLv3"
+name = "pallet-evm-transaction-payment"
+version = "0.1.1"
+
+[dependencies]
+parity-scale-codec = { workspace = true }
+scale-info = { workspace = true }
+
+fp-evm = { workspace = true }
+frame-support = { workspace = true }
+frame-system = { workspace = true }
+pallet-evm = { workspace = true }
+sp-core = { workspace = true }
+sp-runtime = { workspace = true }
+sp-std = { workspace = true }
+up-sponsorship = { workspace = true }
+
+[features]
+default = ["std"]
+std = [
+	"fp-evm/std",
+	"frame-support/std",
+	"frame-system/std",
+	"pallet-evm/std",
+	"sp-core/std",
+	"sp-runtime/std",
+	"sp-std/std",
+	"up-sponsorship/std",
+]
+try-runtime = ["frame-support/try-runtime"]
