@@ -1657,6 +1657,7 @@ construct_runtime! {
 		EvmCoderSubstrate: pallet_evm_coder_substrate = 105,
 		BalancesAdapter: pallet_balances_adapter = 106,
 		EvmAssets: pallet_evm_assets = 107,
+		EvmTransactionPayment: pallet_evm_transaction_payment = 110,
 	}
 }
 
