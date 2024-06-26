@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use frame_support::{
 	parameter_types,
-	traits::{Currency, FindAuthor, Imbalance, OnUnbalanced},
+	traits::FindAuthor,
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 	ConsensusEngineId,
 };
@@ -65,20 +65,61 @@ impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 	}
 }
 
-type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
+pub type DealWithFees = Treasury;
 
-pub struct DealWithFees;
-impl OnUnbalanced<NegativeImbalance> for DealWithFees {
-	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
-		if let Some(fees) = fees_then_tips.next() {
-			// for fees, 100% to treasury
-			let mut split = fees.ration(100, 0);
-			if let Some(tips) = fees_then_tips.next() {
-				// for tips, if any, 100% to treasury
-				tips.ration_merge_into(100, 0, &mut split);
-			}
-			Treasury::on_unbalanced(split.0);
-		}
+use fp_evm::WithdrawReason;
+use frame_support::traits::{Currency, Imbalance, OnUnbalanced};
+use pallet_evm::OnChargeEVMTransaction;
+use sp_runtime::traits::UniqueSaturatedInto;
+
+pub type NegativeImbalanceOf<C, T> =
+	<C as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
+pub struct TipsToTreasuryAdapter<C, OU>(sp_std::marker::PhantomData<(C, OU)>);
+impl<T, C, Treasury> OnChargeEVMTransaction<T> for TipsToTreasuryAdapter<C, Treasury>
+where
+	T: pallet_evm::Config,
+	C: Currency<<T as frame_system::Config>::AccountId>,
+	C::PositiveImbalance: Imbalance<
+		<C as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+		Opposite = C::NegativeImbalance,
+	>,
+	C::NegativeImbalance: Imbalance<
+		<C as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+		Opposite = C::PositiveImbalance,
+	>,
+	Treasury: OnUnbalanced<NegativeImbalanceOf<C, T>>,
+	U256: UniqueSaturatedInto<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance>,
+{
+	type LiquidityInfo =
+		<EVMCurrencyAdapter<C, Treasury> as OnChargeEVMTransaction<T>>::LiquidityInfo;
+
+	fn withdraw_fee(
+		who: &T::CrossAccountId,
+		reason: WithdrawReason,
+		fee: U256,
+	) -> Result<Self::LiquidityInfo, pallet_evm::Error<T>> {
+		<EVMCurrencyAdapter<C, Treasury> as OnChargeEVMTransaction<T>>::withdraw_fee(
+			who, reason, fee,
+		)
+	}
+
+	fn correct_and_deposit_fee(
+		who: &T::CrossAccountId,
+		corrected_fee: U256,
+		base_fee: U256,
+		already_withdrawn: Self::LiquidityInfo,
+	) -> Self::LiquidityInfo {
+		<EVMCurrencyAdapter<C, Treasury> as OnChargeEVMTransaction<T>>::correct_and_deposit_fee(
+			who,
+			corrected_fee,
+			base_fee,
+			already_withdrawn,
+		)
+	}
+
+	fn pay_priority_fee(tip: Self::LiquidityInfo) {
+		let Some(imbalance) = tip else { return };
+		Treasury::on_unbalanced(imbalance)
 	}
 }
 
@@ -104,7 +145,7 @@ impl pallet_evm::Config for Runtime {
 	type OnCreate = ();
 	type ChainId = ChainId;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type OnChargeTransaction = EVMCurrencyAdapter<Balances, DealWithFees>;
+	type OnChargeTransaction = TipsToTreasuryAdapter<Balances, DealWithFees>;
 	type FindAuthor = EthereumFindAuthor<Babe>;
 	type Timestamp = crate::Timestamp;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
