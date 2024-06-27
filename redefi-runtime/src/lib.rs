@@ -150,7 +150,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_030,
+	spec_version: 1_003_0_031,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,
@@ -1657,6 +1657,7 @@ construct_runtime! {
 		EvmCoderSubstrate: pallet_evm_coder_substrate = 105,
 		BalancesAdapter: pallet_balances_adapter = 106,
 		EvmAssets: pallet_evm_assets = 107,
+		EvmTransactionPayment: pallet_evm_transaction_payment = 110,
 	}
 }
 

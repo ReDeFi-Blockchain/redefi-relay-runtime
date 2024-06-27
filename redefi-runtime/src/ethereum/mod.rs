@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 
 use frame_support::{
 	parameter_types,
-	traits::{Currency, FindAuthor, Imbalance, OnUnbalanced},
+	traits::FindAuthor,
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 	ConsensusEngineId,
 };
@@ -13,6 +13,9 @@ use sp_runtime::{traits::ConstU32, Perbill, RuntimeAppPublic};
 
 use crate::*;
 pub mod self_contained_call;
+
+mod sponsoring;
+use sponsoring::EthCrossChainTransferSponsorshipHandler;
 
 pub type CrossAccountId = pallet_evm::account::BasicCrossAccountId<Runtime>;
 
@@ -65,22 +68,12 @@ impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 	}
 }
 
-type NegativeImbalance = <Balances as Currency<AccountId>>::NegativeImbalance;
+pub type DealWithFees = Treasury;
 
-pub struct DealWithFees;
-impl OnUnbalanced<NegativeImbalance> for DealWithFees {
-	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance>) {
-		if let Some(fees) = fees_then_tips.next() {
-			// for fees, 100% to treasury
-			let mut split = fees.ration(100, 0);
-			if let Some(tips) = fees_then_tips.next() {
-				// for tips, if any, 100% to treasury
-				tips.ration_merge_into(100, 0, &mut split);
-			}
-			Treasury::on_unbalanced(split.0);
-		}
-	}
-}
+use fp_evm::WithdrawReason;
+use frame_support::traits::{Currency, Imbalance, OnUnbalanced};
+use pallet_evm::OnChargeEVMTransaction;
+use sp_runtime::traits::UniqueSaturatedInto;
 
 impl pallet_evm::Config for Runtime {
 	type CrossAccountId = CrossAccountId;
@@ -104,12 +97,13 @@ impl pallet_evm::Config for Runtime {
 	type OnCreate = ();
 	type ChainId = ChainId;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	type OnChargeTransaction = EVMCurrencyAdapter<Balances, DealWithFees>;
+	type OnChargeTransaction =
+		pallet_evm_transaction_payment::WrappedEVMCurrencyAdapter<Balances, DealWithFees>;
 	type FindAuthor = EthereumFindAuthor<Babe>;
 	type Timestamp = crate::Timestamp;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 	type GasLimitPovSizeRatio = ProofSizePerGas;
-	type OnCheckEvmTransaction = ();
+	type OnCheckEvmTransaction = pallet_evm_transaction_payment::TransactionValidity<Self>;
 }
 
 parameter_types! {
@@ -126,6 +120,10 @@ impl pallet_ethereum::Config for Runtime {
 }
 
 impl pallet_evm_coder_substrate::Config for Runtime {}
+
+impl pallet_evm_transaction_payment::Config for Runtime {
+	type EvmSponsorshipHandler = EthCrossChainTransferSponsorshipHandler<Self>;
+}
 
 parameter_types! {
 	pub const Decimals: u8 = 18;

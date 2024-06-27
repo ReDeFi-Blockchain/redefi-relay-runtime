@@ -111,7 +111,6 @@ pallet-election-provider-support-benchmarking = { workspace = true, optional = t
 pallet-offences-benchmarking = { workspace = true, optional = true }
 pallet-session-benchmarking = { workspace = true, optional = true }
 pallet-nomination-pools-benchmarking = { workspace = true, optional = true }
-hex-literal = { workspace = true, optional = true }
 
 runtime-common = { workspace = true }
 runtime-parachains = { workspace = true }
@@ -121,6 +120,9 @@ xcm = { workspace = true }
 xcm-executor = { workspace = true }
 xcm-builder = { workspace = true }
 
+# Unique
+up-sponsorship = { workspace = true }
+
 # Frontier
 pallet-ethereum = { workspace = true }
 pallet-evm = { workspace = true }
@@ -129,7 +131,11 @@ fp-rpc = { workspace = true }
 fp-self-contained = { workspace = true }
 pallet-balances-adapter = { workspace = true }
 pallet-evm-coder-substrate = { workspace = true }
+pallet-evm-transaction-payment = { workspace = true }
 pallet-evm-assets = { workspace = true }
+
+# Other
+hex-literal = { workspace = true }
 
 [dev-dependencies]
 tiny-keccak = { workspace = true }
@@ -257,7 +263,6 @@ runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
 	"frame-system-benchmarking/runtime-benchmarks",
 	"frame-system/runtime-benchmarks",
-	"hex-literal",
 	"pallet-asset-rate/runtime-benchmarks",
 	"pallet-babe/runtime-benchmarks",
 	"pallet-bags-list/runtime-benchmarks",

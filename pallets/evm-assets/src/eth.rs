@@ -124,9 +124,12 @@ impl<T: Config> FungibleAssetsHandle<T> {
 #[solidity_interface(name = ERC20Mintable, is(ERC20), enum(derive(PreDispatch)), enum_attr(weight))]
 impl<T: Config> FungibleAssetsHandle<T> {
 	pub fn mint(&mut self, caller: Caller, to: Address, amount: U256) -> Result<()> {
-		self.consume_store_reads(2)?;
+		self.consume_store_reads(3)?;
 		self.consume_store_writes(2)?;
-		<Pallet<T>>::check_owner(self.asset_id(), &caller).map_err(dispatch_to_evm::<T>)?;
+
+		<Pallet<T>>::check_account_permissions(self.asset_id(), &caller, AccountPermissions::MINT)
+			.map_err(dispatch_to_evm::<T>)?;
+
 		let amount = amount.try_into().map_err(|_| "value overflow")?;
 		<Pallet<T>>::mint(self.asset_id(), &to, amount).map_err(dispatch_to_evm::<T>)
 	}
@@ -199,6 +202,32 @@ where
 	}
 }
 
+#[solidity_interface(name = PermissionsExtensions, is(ERC20), enum(derive(PreDispatch)), enum_attr(weight))]
+impl<T: Config> FungibleAssetsHandle<T> {
+	/// Change account permissions.
+	///
+	/// Permissions bits.
+	///
+	/// 1 bit: allow account to mint new tokens.
+	/// 2 - 8 bits: reserved.
+	fn set_account_permissions(
+		&mut self,
+		caller: Caller,
+		account: Address,
+		permissions: u64,
+	) -> Result<()> {
+		self.consume_store_reads(1)?;
+		self.consume_store_writes(1)?;
+
+		<Pallet<T>>::check_owner(self.asset_id(), &caller).map_err(dispatch_to_evm::<T>)?;
+
+		let permissions = AccountPermissions::from_bits_truncate(permissions);
+		<Pallet<T>>::set_account_permissions(self.asset_id(), &account, permissions);
+
+		Ok(())
+	}
+}
+
 /// Implements [`OnMethodCall`], which delegates call to [`NativeFungibleHandle`]
 pub struct AdapterOnMethodCall<T: Config>(PhantomData<*const T>);
 impl<T: Config> OnMethodCall<T> for AdapterOnMethodCall<T>
@@ -234,7 +263,7 @@ where
 
 #[solidity_interface(
 	name = NativeFungibleAssets,
-	is(ERC20, ERC20Burnable, ERC20Mintable, XcmExtensions),
+	is(ERC20, ERC20Burnable, ERC20Mintable, XcmExtensions, PermissionsExtensions),
 	enum(derive(PreDispatch))
 )]
 impl<T: Config> FungibleAssetsHandle<T>
