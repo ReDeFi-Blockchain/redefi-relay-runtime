@@ -23,6 +23,7 @@ xcm = { workspace = true }
 
 [features]
 default = ["std"]
+testnet-id = []
 std = [
 	"frame-support/std",
 	"primitives/std",
