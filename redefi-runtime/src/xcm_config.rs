@@ -38,7 +38,7 @@ use xcm_builder::{
 	CurrencyAdapter as XcmCurrencyAdapter, DescribeAllTerminal, DescribeFamily, HashedDescription,
 	IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
 	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, TrailingSetTopicAsId,
-	WeightInfoBounds, WithComputedOrigin, WithUniqueTopic, XcmFeesToAccount,
+	WeightInfoBounds, WithComputedOrigin, WithUniqueTopic, XcmFeeToAccount, XcmFeeManagerFromComponents,
 };
 use xcm_executor::traits::WithOriginFilter;
 
@@ -336,7 +336,10 @@ impl xcm_executor::Config for XcmConfig {
 	type SubscriptionService = XcmPallet;
 	type PalletInstancesInfo = AllPalletsWithSystem;
 	type MaxAssetsIntoHolding = MaxAssetsIntoHolding;
-	type FeeManager = XcmFeesToAccount<Self, WaivedLocations, AccountId, TreasuryAccount>;
+	type FeeManager = XcmFeeManagerFromComponents<
+		WaivedLocations,
+		XcmFeeToAccount<Self::AssetTransactor, AccountId, TreasuryAccount>,
+	>;
 	// No bridges yet...
 	type MessageExporter = ();
 	type UniversalAliases = Nothing;

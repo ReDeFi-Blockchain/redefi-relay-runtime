@@ -7,7 +7,7 @@ use frame_support::{
 	ConsensusEngineId,
 };
 use pallet_ethereum::PostLogContent;
-use pallet_evm::{EVMCurrencyAdapter, EnsureAddressTruncated, HashedAddressMapping};
+use pallet_evm::{EnsureAddressTruncated, HashedAddressMapping};
 use polkadot_runtime_constants::{system_parachain::RED_ID, TOKEN_SYMBOL};
 use sp_runtime::{traits::ConstU32, Perbill, RuntimeAppPublic};
 
@@ -69,11 +69,6 @@ impl<T: pallet_evm::Config> fp_evm::FeeCalculator for FeeCalculator<T> {
 }
 
 pub type DealWithFees = Treasury;
-
-use fp_evm::WithdrawReason;
-use frame_support::traits::{Currency, Imbalance, OnUnbalanced};
-use pallet_evm::OnChargeEVMTransaction;
-use sp_runtime::traits::UniqueSaturatedInto;
 
 impl pallet_evm::Config for Runtime {
 	type CrossAccountId = CrossAccountId;

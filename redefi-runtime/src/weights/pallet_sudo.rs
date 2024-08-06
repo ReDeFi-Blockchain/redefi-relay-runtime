@@ -84,4 +84,16 @@ impl<T: frame_system::Config> pallet_sudo::WeightInfo for WeightInfo<T> {
 			.saturating_add(Weight::from_parts(0, 1517))
 			.saturating_add(T::DbWeight::get().reads(1))
 	}
+	/// Storage: `Sudo::Key` (r:1 w:1)
+	/// Proof: `Sudo::Key` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
+	fn remove_key() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `132`
+		//  Estimated: `1517`
+		// Minimum execution time: 7_843_000 picoseconds.
+		Weight::from_parts(8_152_000, 0)
+			.saturating_add(Weight::from_parts(0, 1517))
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+	}
 }
