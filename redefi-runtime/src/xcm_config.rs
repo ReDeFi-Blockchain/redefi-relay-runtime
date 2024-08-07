@@ -35,8 +35,8 @@ use xcm::latest::{prelude::*, Fungibility};
 use xcm_builder::{
 	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
 	AllowTopLevelPaidExecutionFrom, ChildParachainAsNative, ChildParachainConvertsVia,
-	CurrencyAdapter as XcmCurrencyAdapter, DescribeAllTerminal, DescribeFamily, HashedDescription,
-	IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
+	CurrencyAdapter as XcmCurrencyAdapter, DescribeAllTerminal, DescribeFamily, FrameTransactionalProcessor,
+	HashedDescription, IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
 	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, TrailingSetTopicAsId,
 	WeightInfoBounds, WithComputedOrigin, WithUniqueTopic, XcmFeeToAccount, XcmFeeManagerFromComponents,
 };
@@ -346,6 +346,7 @@ impl xcm_executor::Config for XcmConfig {
 	type CallDispatcher = WithOriginFilter<SafeCallFilter>;
 	type SafeCallFilter = SafeCallFilter;
 	type Aliasers = Nothing;
+	type TransactionalProcessor = FrameTransactionalProcessor;
 }
 
 parameter_types! {
