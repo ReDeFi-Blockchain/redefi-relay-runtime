@@ -55,7 +55,7 @@ use pallet_session::historical as session_historical;
 pub use pallet_staking::StakerStatus;
 use pallet_staking::UseValidatorsMap;
 pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::{FeeDetails, FungibleAdapter, RuntimeDispatchInfo};
+use pallet_transaction_payment::{CurrencyAdapter, FeeDetails, RuntimeDispatchInfo};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 /// Constant values used within the runtime.
 use polkadot_runtime_constants::{currency::*, fee::*, time::*, TREASURY_PALLET_ID};
@@ -78,9 +78,7 @@ use runtime_common::{
 };
 use runtime_parachains::{
 	assigner_parachains as parachains_assigner_parachains,
-	configuration as parachains_configuration,
-	configuration::ActiveConfigHrmpChannelSizeAndCapacityRatio,
-	disputes as parachains_disputes,
+	configuration as parachains_configuration, disputes as parachains_disputes,
 	disputes::slashing as parachains_slashing,
 	dmp as parachains_dmp, hrmp as parachains_hrmp, inclusion as parachains_inclusion,
 	inclusion::{AggregateMessageOrigin, UmpQueueId},
@@ -416,7 +414,7 @@ parameter_types! {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
+	type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 	type WeightToFee = WeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
@@ -1353,10 +1351,6 @@ impl parachains_hrmp::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ChannelManager = EitherOf<EnsureRoot<Self::AccountId>, GeneralAdmin>;
 	type Currency = Balances;
-	type DefaultChannelSizeAndCapacityWithSystem = ActiveConfigHrmpChannelSizeAndCapacityRatio<
-		Runtime,
-		HrmpChannelSizeAndCapacityWithSystemRatio,
-	>;
 	type WeightInfo = weights::runtime_parachains_hrmp::WeightInfo<Self>;
 }
 
@@ -2044,10 +2038,6 @@ sp_api::impl_runtime_apis! {
 
 		fn eras_stakers_page_count(era: sp_staking::EraIndex, account: AccountId) -> sp_staking::Page {
 			Staking::api_eras_stakers_page_count(era, account)
-		}
-
-		fn pending_rewards(era: sp_staking::EraIndex, account: AccountId) -> bool {
-			Staking::api_pending_rewards(era, account)
 		}
 	}
 
