@@ -25,8 +25,8 @@ use sp_runtime::{
 use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, ops::Deref, prelude::*};
 use staging_xcm::{
 	latest::{
-		AssetId as XcmAssetId, Fungibility, Junction, Junctions, MultiAsset as XcmAsset,
-		MultiLocation as Location, NetworkId,
+		AssetId as XcmAssetId, Fungibility, Junction, Junctions, Asset as XcmAsset,
+		Location, NetworkId,
 	},
 	prelude::WeightLimit,
 };

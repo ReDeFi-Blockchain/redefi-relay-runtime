@@ -22,7 +22,7 @@ use sp_core::{H160, U256};
 use sp_runtime::TokenError;
 use sp_std::{boxed::Box, collections::btree_map::BTreeMap};
 use xcm::{
-	latest::{Fungibility, Junction, Junctions, MultiAsset as XcmAsset, MultiLocation as Location},
+	latest::{Fungibility, Junction, Asset as XcmAsset, Location},
 	prelude::WeightLimit,
 };
 pub mod eth;

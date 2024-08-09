@@ -150,7 +150,7 @@ where
 	) -> Result<()> {
 		let amount = amount.try_into().map_err(|_| "value overflow")?;
 		let locator = <T as Config>::ChainLocator::get();
-		let destination = *locator.get(&chain_id).ok_or("chain not found")?;
+		let destination = locator.get(&chain_id).ok_or("chain not found")?;
 		let relay_network = T::UniversalLocation::get()
 			.global_consensus()
 			.map_err(|_| "unable to get global consensus")?;
@@ -163,9 +163,9 @@ where
 		// Determining the asset location relative to the relay.
 		// For relay - 0, for parachains - 1.
 		// Correctness is ensured by the correct configuration of the `ChainLocator`.
-		let parents = match (destination.parent_count(), destination.interior()) {
-			(1, Junctions::Here) | (1, Junctions::X1(Junction::Parachain(_))) => Ok(1),
-			(0, Junctions::X1(Junction::Parachain(_))) => Ok(0),
+		let parents = match destination.unpack() {
+			(1, &[]) | (1, &[Junction::Parachain(_)]) => Ok(1),
+			(0, &[Junction::Parachain(_)]) => Ok(0),
 			_ => Err("unsupported location pattern"),
 		}?;
 
@@ -192,7 +192,7 @@ where
 		let fee_asset_item = 0;
 		<PalletXcm<T>>::limited_teleport_assets(
 			EthereumOrigin::EthereumTransaction(caller).into(),
-			Box::new(destination.into()),
+			Box::new(destination.clone().into()),
 			Box::new(beneficiary.into()),
 			Box::new(asset.into()),
 			fee_asset_item,

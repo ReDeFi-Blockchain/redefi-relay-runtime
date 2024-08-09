@@ -17,7 +17,7 @@
 //! XCM configuration for Polkadot.
 
 use frame_support::{
-	match_types, parameter_types,
+	parameter_types,
 	traits::{ContainsPair, Equals, Everything, Nothing},
 	weights::Weight,
 };
@@ -32,29 +32,31 @@ use runtime_common::xcm_sender::{ChildParachainRouter, NoPriceForMessageDelivery
 use runtime_parachains::FeeTracker;
 use sp_core::ConstU32;
 use xcm::latest::{prelude::*, Fungibility};
+#[allow(deprecated)]
+use xcm_builder::CurrencyAdapter;
 use xcm_builder::{
 	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
 	AllowTopLevelPaidExecutionFrom, ChildParachainAsNative, ChildParachainConvertsVia,
-	CurrencyAdapter as XcmCurrencyAdapter, DescribeAllTerminal, DescribeFamily, FrameTransactionalProcessor,
+	DescribeAllTerminal, DescribeFamily, FrameTransactionalProcessor,
 	HashedDescription, IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
 	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, TrailingSetTopicAsId,
 	WeightInfoBounds, WithComputedOrigin, WithUniqueTopic, XcmFeeToAccount, XcmFeeManagerFromComponents,
 };
-use xcm_executor::traits::WithOriginFilter;
+use xcm_executor::{traits::WithOriginFilter, AssetsInHolding};
 
 use self::{ethereum::AdapterContractAddress, fungible_adapter::FungibleAdapter};
 use super::*;
 
 parameter_types! {
-	pub const RootLocation: MultiLocation = Here.into_location();
+	pub const RootLocation: Location = Here.into_location();
 	/// The location of the DOT token, from the context of this chain. Since this token is native to this
 	/// chain, we make it synonymous with it and thus it is the `Here` location, which means "equivalent to
 	/// the context".
-	pub const TokenLocation: MultiLocation = Here.into_location();
+	pub const TokenLocation: Location = Here.into_location();
 	/// The ReDeFi network ID. This is named.
 	pub const ThisNetwork: NetworkId = NetworkId::Ethereum { chain_id: ChainId::get() };
 	/// Our location in the universe of consensus systems.
-	pub const UniversalLocation: InteriorMultiLocation = X1(GlobalConsensus(ThisNetwork::get()));
+	pub UniversalLocation: InteriorLocation = [GlobalConsensus(ThisNetwork::get())].into();
 	/// The Checking Account, which holds any native assets that have been teleported out and not back in (yet).
 	pub CheckAccount: AccountId = XcmPallet::check_account();
 	/// The Checking Account along with the indication that the local chain is able to mint tokens.
@@ -135,7 +137,8 @@ pub type EvmAssetsTransactor =
 /// of view of XCM-only concepts like `MultiLocation` and `MultiAsset`.
 ///
 /// Ours is only aware of the Balances pallet, which is mapped to `TokenLocation`.
-pub type LocalAssetTransactor = XcmCurrencyAdapter<
+#[allow(deprecated)]
+pub type LocalAssetTransactor = CurrencyAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
@@ -191,7 +194,7 @@ parameter_types! {
 	/// calculations getting too crazy.
 	pub const MaxInstructions: u32 = 100;
 	/// The asset ID for the asset that we use to pay for message delivery fees.
-	pub FeeAssetId: AssetId = Concrete(TokenLocation::get());
+	pub FeeAssetId: AssetId = AssetId(TokenLocation::get());
 	/// The base fee for the message delivery fees.
 	pub const BaseDeliveryFee: u128 = CENTS.saturating_mul(3);
 }
@@ -206,36 +209,35 @@ pub type XcmRouter = WithUniqueTopic<(
 )>;
 
 parameter_types! {
-	pub const Dot: MultiAssetFilter = Wild(AllOf { fun: WildFungible, id: Concrete(TokenLocation::get()) });
-	pub const AssetHubLocation: MultiLocation = Parachain(ASSET_HUB_ID).into_location();
-	pub const DotForAssetHub: (MultiAssetFilter, MultiLocation) = (Dot::get(), AssetHubLocation::get());
-	pub const CollectivesLocation: MultiLocation = Parachain(COLLECTIVES_ID).into_location();
-	pub const DotForCollectives: (MultiAssetFilter, MultiLocation) = (Dot::get(), CollectivesLocation::get());
-	pub const BridgeHubLocation: MultiLocation = Parachain(BRIDGE_HUB_ID).into_location();
-	pub const DotForBridgeHub: (MultiAssetFilter, MultiLocation) = (Dot::get(), BridgeHubLocation::get());
+	pub const Dot: AssetFilter = Wild(AllOf { fun: WildFungible, id: AssetId(TokenLocation::get()) });
+	pub AssetHubLocation: Location = Parachain(ASSET_HUB_ID).into_location();
+	pub DotForAssetHub: (AssetFilter, Location) = (Dot::get(), AssetHubLocation::get());
+	pub CollectivesLocation: Location = Parachain(COLLECTIVES_ID).into_location();
+	pub DotForCollectives: (AssetFilter, Location) = (Dot::get(), CollectivesLocation::get());
+	pub BridgeHubLocation: Location = Parachain(BRIDGE_HUB_ID).into_location();
+	pub DotForBridgeHub: (AssetFilter, Location) = (Dot::get(), BridgeHubLocation::get());
 	pub const MaxAssetsIntoHolding: u32 = 64;
 }
 
 pub struct EvmAssetsOnRelay;
-impl ContainsPair<MultiAsset, MultiLocation> for EvmAssetsOnRelay {
-	fn contains(a: &MultiAsset, b: &MultiLocation) -> bool {
-		let MultiAsset {
-			id:
-				AssetId::Concrete(MultiLocation {
-					parents: 0,
-					interior:
-						Junctions::X1(Junction::AccountKey20 {
-							network: Some(network),
-							key,
-						}),
-				}),
-			fun: Fungibility::Fungible(_),
-		} = a
+impl ContainsPair<Asset, Location> for EvmAssetsOnRelay {
+	fn contains(a: &Asset, b: &Location) -> bool {
+		let unpack = (a.id.0.unpack(), &a.fun);
+		let (
+			(
+				0,
+				&[Junction::AccountKey20 {
+					network: Some(network),
+					key,
+				}],
+			),
+			&Fungibility::Fungible(_),
+		) = unpack
 		else {
 			return false;
 		};
 
-		if *network != ThisNetwork::get() {
+		if network != ThisNetwork::get() {
 			return false;
 		}
 
@@ -243,11 +245,10 @@ impl ContainsPair<MultiAsset, MultiLocation> for EvmAssetsOnRelay {
 			return false;
 		}
 
-		let MultiLocation {
-			parents: 0,
-			interior: Junctions::X1(Junction::Parachain(_)),
-		} = b
-		else {
+		let (
+			0,
+			&[Junction::Parachain(_)],
+		) = b.unpack() else {
 			return false;
 		};
 		true
@@ -268,22 +269,26 @@ impl WeightTrader for FreeForAll {
 	fn buy_weight(
 		&mut self,
 		weight: Weight,
-		payment: Assets,
+		payment: AssetsInHolding,
 		_xcm: &XcmContext,
-	) -> Result<Assets, XcmError> {
+	) -> Result<AssetsInHolding, XcmError> {
 		log::trace!(target: "fassets::weight", "buy_weight weight: {:?}, payment: {:?}", weight, payment);
 		Ok(payment)
 	}
 }
 
-match_types! {
-	pub type OnlyParachains: impl Contains<MultiLocation> = {
-		MultiLocation { parents: 0, interior: X1(Parachain(_)) }
-	};
+pub struct OnlyParachains;
+impl Contains<Location> for OnlyParachains {
+	fn contains(loc: &Location) -> bool {
+		matches!(loc.unpack(), (0, [Parachain(_)]))
+	}
+}
 
-	pub type LocalPlurality: impl Contains<MultiLocation> = {
-		MultiLocation { parents: 0, interior: X1(Plurality { .. }) }
-	};
+pub struct LocalPlurality;
+impl Contains<Location> for LocalPlurality {
+	fn contains(loc: &Location) -> bool {
+		matches!(loc.unpack(), (0, [Plurality { .. }]))
+	}
 }
 
 /// The barriers one of which must be passed for an XCM message to be executed.

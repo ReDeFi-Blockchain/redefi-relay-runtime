@@ -134,18 +134,12 @@ pub mod system_parachain {
 	/// Layer 2 parachain ID.
 	pub const RED_ID: u32 = 2000;
 
-	frame_support::match_types! {
-		// System parachains from Polkadot point of view.
-		pub type SystemParachains: impl Contains<MultiLocation> = {
-			MultiLocation {
-				parents: 0,
-				interior: X1(Parachain(
-					ASSET_HUB_ID |
-					COLLECTIVES_ID |
-					BRIDGE_HUB_ID
-				)),
-			}
-		};
+	// System parachains from Polkadot point of view.
+	pub struct SystemParachains;
+	impl frame_support::traits::Contains<Location> for SystemParachains {
+		fn contains(l: &Location) -> bool {
+			matches!(l.unpack(), (0, &[Parachain(ASSET_HUB_ID | COLLECTIVES_ID | BRIDGE_HUB_ID)]))
+		}
 	}
 }
 

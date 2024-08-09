@@ -5,11 +5,11 @@ use frame_support::traits::{
 	Get,
 };
 use sp_std::{marker::PhantomData, prelude::*, result};
-use xcm::latest::{Error as XcmError, MultiAsset as Asset, Result as XcmResult, XcmContext};
+use xcm::latest::{Error as XcmError, Asset, Result as XcmResult, XcmContext};
 use xcm_builder::MintLocation;
 use xcm_executor::{
 	traits::{ConvertLocation, Error as MatchError, MatchesFungible, TransactAsset},
-	Assets as AssetsInHolding,
+	AssetsInHolding,
 };
 
 // Copyright (C) Parity Technologies (UK) Ltd.

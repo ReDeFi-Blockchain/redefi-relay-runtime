@@ -1,24 +1,21 @@
-use staging_xcm::latest::MultiAsset as Asset;
+use staging_xcm::latest::Asset;
 use xcm_executor::traits::{prelude::Error as XcmError, MatchesFungibles};
 
 use crate::*;
 
 impl<T: Config> MatchesFungibles<AssetId, Balance> for Pallet<T> {
 	fn matches_fungibles(a: &Asset) -> core::result::Result<(AssetId, Balance), XcmError> {
-		let (relay_parent, relay_network_id) = match T::UniversalLocation::get() {
-			Junctions::X1(Junction::GlobalConsensus(network_id)) => Ok((0, network_id)),
-			Junctions::X2(Junction::GlobalConsensus(network_id), Junction::Parachain(_)) => {
+		let (relay_parent, relay_network_id) = match T::UniversalLocation::get().as_slice() {
+			&[Junction::GlobalConsensus(network_id)] => Ok((0, network_id)),
+			&[Junction::GlobalConsensus(network_id), Junction::Parachain(_)] => {
 				Ok((1, network_id))
 			}
 			_ => Err(XcmError::AssetNotHandled),
 		}?;
-		let XcmAssetId::Concrete(Location {
+		let XcmAssetId(Location {
 			parents,
 			interior: asset_interior,
-		}) = &a.id
-		else {
-			return Err(XcmError::AssetNotHandled);
-		};
+		}) = &a.id;
 
 		if *parents != relay_parent {
 			return Err(XcmError::AssetNotHandled);
@@ -28,13 +25,13 @@ impl<T: Config> MatchesFungibles<AssetId, Balance> for Pallet<T> {
 			return Err(XcmError::AssetNotHandled);
 		};
 
-		let Junction::AccountKey20 {
+		let [Junction::AccountKey20 {
 			network: Some(network_id),
 			key: contract_addr,
-		} = asset_junctions
-		else {
+		}] = asset_junctions.as_ref() else {
 			return Err(XcmError::AssetNotHandled);
 		};
+
 
 		if *network_id != relay_network_id {
 			return Err(XcmError::AssetNotHandled);
