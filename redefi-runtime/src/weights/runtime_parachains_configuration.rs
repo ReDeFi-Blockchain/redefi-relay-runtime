@@ -173,4 +173,20 @@ impl<T: frame_system::Config> runtime_parachains::configuration::WeightInfo for 
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
+	/// Storage: `Configuration::PendingConfigs` (r:1 w:1)
+	/// Proof: `Configuration::PendingConfigs` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	/// Storage: `Configuration::BypassConsistencyCheck` (r:1 w:0)
+	/// Proof: `Configuration::BypassConsistencyCheck` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	/// Storage: `ParasShared::CurrentSessionIndex` (r:1 w:0)
+	/// Proof: `ParasShared::CurrentSessionIndex` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	fn set_config_with_scheduler_params() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `151`
+		//  Estimated: `1636`
+		// Minimum execution time: 7_718_000 picoseconds.
+		Weight::from_parts(7_984_000, 0)
+			.saturating_add(Weight::from_parts(0, 1636))
+			.saturating_add(T::DbWeight::get().reads(3))
+			.saturating_add(T::DbWeight::get().writes(1))
+	}
 }

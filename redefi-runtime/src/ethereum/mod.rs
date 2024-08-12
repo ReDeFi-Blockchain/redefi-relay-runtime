@@ -45,6 +45,7 @@ parameter_types! {
 const EVM_DISPATCH_RATIO: Perbill = Perbill::from_percent(50);
 parameter_types! {
 	pub BlockGasLimit: U256 = U256::from((NORMAL_DISPATCH_RATIO * EVM_DISPATCH_RATIO * MAXIMUM_BLOCK_WEIGHT / WeightTimePerGas::get()).ref_time());
+	pub SuicideQuickClearLimit: u32 = 0;
 }
 
 pub struct EthereumFindAuthor<F>(core::marker::PhantomData<F>);
@@ -98,6 +99,7 @@ impl pallet_evm::Config for Runtime {
 	type Timestamp = crate::Timestamp;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 	type GasLimitPovSizeRatio = ProofSizePerGas;
+	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 	type OnCheckEvmTransaction = pallet_evm_transaction_payment::TransactionValidity<Self>;
 }
 
