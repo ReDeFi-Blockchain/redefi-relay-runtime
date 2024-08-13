@@ -26,19 +26,17 @@ use pallet_xcm::XcmPassthrough;
 use polkadot_runtime_constants::{
 	currency::CENTS,
 	system_parachain::*,
-	xcm::body::{FELLOWSHIP_ADMIN_INDEX, TREASURER_INDEX},
+	xcm::body::FELLOWSHIP_ADMIN_INDEX,
 };
 use runtime_common::xcm_sender::{ChildParachainRouter, NoPriceForMessageDelivery};
 use runtime_parachains::FeeTracker;
 use sp_core::ConstU32;
 use xcm::latest::{prelude::*, Fungibility};
-#[allow(deprecated)]
-use xcm_builder::CurrencyAdapter;
 use xcm_builder::{
 	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
 	AllowTopLevelPaidExecutionFrom, ChildParachainAsNative, ChildParachainConvertsVia,
 	DescribeAllTerminal, DescribeFamily, FrameTransactionalProcessor,
-	HashedDescription, IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
+	FungibleAdapter as XcmFungibleAdapter, HashedDescription, IsConcrete, MintLocation, OriginToPluralityVoice, SignedAccountId32AsNative,
 	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, TrailingSetTopicAsId,
 	WeightInfoBounds, WithComputedOrigin, WithUniqueTopic, XcmFeeToAccount, XcmFeeManagerFromComponents,
 };
@@ -137,8 +135,7 @@ pub type EvmAssetsTransactor =
 /// of view of XCM-only concepts like `MultiLocation` and `MultiAsset`.
 ///
 /// Ours is only aware of the Balances pallet, which is mapped to `TokenLocation`.
-#[allow(deprecated)]
-pub type LocalAssetTransactor = CurrencyAdapter<
+pub type LocalAssetTransactor = XcmFungibleAdapter<
 	// Use this currency:
 	Balances,
 	// Use this currency when it is a fungible asset matching the given location or name:
@@ -352,6 +349,9 @@ impl xcm_executor::Config for XcmConfig {
 	type SafeCallFilter = SafeCallFilter;
 	type Aliasers = Nothing;
 	type TransactionalProcessor = FrameTransactionalProcessor;
+	type HrmpNewChannelOpenRequestHandler = ();
+	type HrmpChannelAcceptedHandler = ();
+	type HrmpChannelClosingHandler = ();
 }
 
 parameter_types! {
@@ -362,7 +362,7 @@ parameter_types! {
 	// FellowshipAdmin pluralistic body.
 	pub const FellowshipAdminBodyId: BodyId = BodyId::Index(FELLOWSHIP_ADMIN_INDEX);
 	// `Treasurer` pluralistic body.
-	pub const TreasurerBodyId: BodyId = BodyId::Index(TREASURER_INDEX);
+	pub const TreasurerBodyId: BodyId = BodyId::Treasury;
 }
 
 #[cfg(feature = "runtime-benchmarks")]

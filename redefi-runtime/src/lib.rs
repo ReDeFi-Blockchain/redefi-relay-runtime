@@ -31,11 +31,11 @@ use frame_election_provider_support::{
 };
 use frame_support::{
 	construct_runtime, derive_impl,
-	genesis_builder_helper::{build_config, create_default_config},
+	genesis_builder_helper::{build_state, get_preset},
 	parameter_types,
 	traits::{
-		fungible::HoldConsideration, ConstU32, Contains, EitherOf, EitherOfDiverse, Get,
-		InstanceFilter, KeyOwnerProofSystem, LinearStoragePrice, OnFinalize as _, PrivilegeCmp,
+		fungible::HoldConsideration, tokens::UnityOrOuterConversion, ConstU32, ConstU8, Contains, EitherOf, EitherOfDiverse,
+		FromContains,Get, InstanceFilter, KeyOwnerProofSystem, LinearStoragePrice, OnFinalize as _, PrivilegeCmp,
 		ProcessMessage, ProcessMessageError, WithdrawReasons,
 	},
 	weights::{ConstantMultiplier, WeightMeter},
@@ -55,14 +55,14 @@ use pallet_session::historical as session_historical;
 pub use pallet_staking::StakerStatus;
 use pallet_staking::UseValidatorsMap;
 pub use pallet_timestamp::Call as TimestampCall;
-use pallet_transaction_payment::{CurrencyAdapter, FeeDetails, RuntimeDispatchInfo};
+use pallet_transaction_payment::{FungibleAdapter, FeeDetails, RuntimeDispatchInfo};
 use parity_scale_codec::{Decode, Encode, MaxEncodedLen};
 /// Constant values used within the runtime.
 use polkadot_runtime_constants::{currency::*, fee::*, time::*, TREASURY_PALLET_ID};
 use primitives::{
-	slashing, AccountId, AccountIndex, Balance, BlockNumber, CandidateEvent, CandidateHash,
-	CommittedCandidateReceipt, CoreState, DisputeState, ExecutorParams, GroupRotationInfo, Hash,
-	Id as ParaId, InboundDownwardMessage, InboundHrmpMessage, Moment, Nonce,
+	slashing, AccountId, AccountIndex, ApprovalVotingParams, Balance, BlockNumber, CandidateEvent, CandidateHash,
+	CommittedCandidateReceipt, CoreIndex, CoreState, DisputeState, ExecutorParams, GroupRotationInfo, Hash,
+	Id as ParaId, InboundDownwardMessage, InboundHrmpMessage, Moment, NodeFeatures, Nonce,
 	OccupiedCoreAssumption, PersistedValidationData, ScrapedOnChainVotes, SessionInfo, Signature,
 	ValidationCode, ValidationCodeHash, ValidatorId, ValidatorIndex, LOWEST_PUBLIC_ID,
 	PARACHAIN_KEY_TYPE_ID,
@@ -70,7 +70,7 @@ use primitives::{
 use runtime_common::{
 	auctions, claims, crowdloan, impl_runtime_weights,
 	impls::{
-		DealWithFees, LocatableAssetConverter, VersionedLocatableAsset,
+		DealWithFees, ContainsParts, LocatableAssetConverter, VersionedLocatableAsset,
 		VersionedLocationConverter,
 	},
 	paras_registrar, prod_or_fast, slots, BlockHashCount, BlockLength, CurrencyToVote,
@@ -84,7 +84,9 @@ use runtime_parachains::{
 	inclusion::{AggregateMessageOrigin, UmpQueueId},
 	initializer as parachains_initializer, origin as parachains_origin, paras as parachains_paras,
 	paras_inherent as parachains_paras_inherent, reward_points as parachains_reward_points,
-	runtime_api_impl::v7 as parachains_runtime_api_impl,
+	runtime_api_impl::{
+		v10 as parachains_runtime_api_impl, vstaging as vstaging_parachains_runtime_api_impl,
+	},
 	scheduler as parachains_scheduler, session_info as parachains_session_info,
 	shared as parachains_shared,
 };
@@ -104,7 +106,12 @@ use sp_runtime::{
 	ApplyExtrinsicResult, FixedU128, KeyTypeId, Perbill, Percent, Permill, RuntimeDebug,
 };
 use sp_staking::SessionIndex;
-use sp_std::{cmp::Ordering, collections::btree_map::BTreeMap, marker::PhantomData, prelude::*};
+use sp_std::{
+	cmp::Ordering,
+	collections::{btree_map::BTreeMap, vec_deque::VecDeque},
+	marker::PhantomData,
+	prelude::*,
+};
 #[cfg(any(feature = "std", test))]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -352,6 +359,7 @@ impl pallet_mmr::Config for Runtime {
 	type OnNewRoot = pallet_beefy_mmr::DepositBeefyDigest<Runtime>;
 	type WeightInfo = ();
 	type LeafData = pallet_beefy_mmr::Pallet<Runtime>;
+	type BlockHashProvider = pallet_mmr::DefaultBlockHashProvider<Runtime>;
 }
 
 /// MMR helper types.
@@ -387,9 +395,11 @@ parameter_types! {
 pub struct ParaHeadsRootProvider;
 impl BeefyDataProvider<H256> for ParaHeadsRootProvider {
 	fn extra_data() -> H256 {
-		let mut para_heads: Vec<(u32, Vec<u8>)> = Paras::parachains()
+		let mut para_heads: Vec<(u32, Vec<u8>)> = parachains_paras::Parachains::<Runtime>::get()
 			.into_iter()
-			.filter_map(|id| Paras::para_head(id).map(|head| (id.into(), head.0)))
+			.filter_map(|id| {
+				parachains_paras::Heads::<Runtime>::get(&id).map(|head| (id.into(), head.0))
+			})
 			.collect();
 		para_heads.sort_by_key(|k| k.0);
 		binary_merkle_tree::merkle_root::<mmr::Hashing, _>(
@@ -414,7 +424,7 @@ parameter_types! {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = CurrencyAdapter<Balances, DealWithFees<Runtime>>;
+	type OnChargeTransaction = FungibleAdapter<Balances, DealWithFees<Runtime>>;
 	type OperationalFeeMultiplier = OperationalFeeMultiplier;
 	type WeightToFee = WeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
@@ -699,7 +709,7 @@ impl pallet_staking::EraPayout<Balance> for EraPayout {
 		era_duration_millis: u64,
 	) -> (Balance, Balance) {
 		// all para-ids that are not active.
-		let auctioned_slots = Paras::parachains()
+		let auctioned_slots = parachains_paras::Parachains::<Runtime>::get()
 			.into_iter()
 			// all active para-ids that do not belong to a system chain is the number
 			// of parachains that we should take into account for inflation.
@@ -846,7 +856,15 @@ impl pallet_treasury::Config for Runtime {
 		LocatableAssetConverter,
 		VersionedLocationConverter,
 	>;
-	type BalanceConverter = AssetRate;
+	type BalanceConverter = UnityOrOuterConversion<
+		ContainsParts<
+			FromContains<
+				xcm_builder::IsChildSystemParachain<ParaId>,
+				xcm_builder::IsParentsOnly<ConstU8<1>>,
+			>,
+		>,
+		AssetRate,
+	>;
 	type PayoutPeriod = PayoutSpendPeriod;
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = runtime_common::impls::benchmarks::TreasuryArguments;
@@ -1330,6 +1348,7 @@ impl pallet_message_queue::Config for Runtime {
 	type HeapSize = MessageQueueHeapSize;
 	type MaxStale = MessageQueueMaxStale;
 	type ServiceWeight = MessageQueueServiceWeight;
+	type IdleMaxServiceWeight = MessageQueueServiceWeight;
 	#[cfg(not(feature = "runtime-benchmarks"))]
 	type MessageProcessor = MessageProcessor;
 	#[cfg(feature = "runtime-benchmarks")]
@@ -1343,7 +1362,7 @@ impl pallet_message_queue::Config for Runtime {
 impl parachains_dmp::Config for Runtime {}
 
 parameter_types! {
-	pub const HrmpChannelSizeAndCapacityWithSystemRatio: Percent = Percent::from_percent(100);
+	pub const DefaultChannelSizeAndCapacityWithSystem: (u32, u32) = (4096, 4);
 }
 
 impl parachains_hrmp::Config for Runtime {
@@ -1351,6 +1370,7 @@ impl parachains_hrmp::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type ChannelManager = EitherOf<EnsureRoot<Self::AccountId>, GeneralAdmin>;
 	type Currency = Balances;
+	type DefaultChannelSizeAndCapacityWithSystem = DefaultChannelSizeAndCapacityWithSystem;
 	type WeightInfo = weights::runtime_parachains_hrmp::WeightInfo<Self>;
 }
 
@@ -1498,6 +1518,7 @@ impl pallet_nomination_pools::Config for Runtime {
 	type MaxUnbonding = <Self as pallet_staking::Config>::MaxUnlockingChunks;
 	type PalletId = PoolsPalletId;
 	type MaxPointsToBalance = MaxPointsToBalance;
+	type AdminOrigin = EitherOf<EnsureRoot<AccountId>, StakingAdmin>;
 	type WeightInfo = weights::pallet_nomination_pools::WeightInfo<Self>;
 }
 
@@ -2057,6 +2078,7 @@ sp_api::impl_runtime_apis! {
 		}
 	}
 
+	#[api_version(11)]
 	impl primitives::runtime_api::ParachainHost<Block> for Runtime {
 		fn validators() -> Vec<ValidatorId> {
 			parachains_runtime_api_impl::validators::<Runtime>()
@@ -2102,6 +2124,7 @@ sp_api::impl_runtime_apis! {
 		}
 
 		fn candidate_pending_availability(para_id: ParaId) -> Option<CommittedCandidateReceipt<Hash>> {
+			#[allow(deprecated)]
 			parachains_runtime_api_impl::candidate_pending_availability::<Runtime>(para_id)
 		}
 
@@ -2187,11 +2210,43 @@ sp_api::impl_runtime_apis! {
 				key_ownership_proof,
 			)
 		}
+
+		fn minimum_backing_votes() -> u32 {
+			parachains_runtime_api_impl::minimum_backing_votes::<Runtime>()
+		}
+
+		fn para_backing_state(para_id: ParaId) -> Option<primitives::async_backing::BackingState> {
+			parachains_runtime_api_impl::backing_state::<Runtime>(para_id)
+		}
+
+		fn async_backing_params() -> primitives::AsyncBackingParams {
+			parachains_runtime_api_impl::async_backing_params::<Runtime>()
+		}
+
+		fn approval_voting_params() -> ApprovalVotingParams {
+			parachains_runtime_api_impl::approval_voting_params::<Runtime>()
+		}
+
+		fn disabled_validators() -> Vec<ValidatorIndex> {
+			parachains_runtime_api_impl::disabled_validators::<Runtime>()
+		}
+
+		fn node_features() -> NodeFeatures {
+			parachains_runtime_api_impl::node_features::<Runtime>()
+		}
+
+		fn claim_queue() -> BTreeMap<CoreIndex, VecDeque<ParaId>> {
+			vstaging_parachains_runtime_api_impl::claim_queue::<Runtime>()
+		}
+
+		fn candidates_pending_availability(para_id: ParaId) -> Vec<CommittedCandidateReceipt<Hash>> {
+			vstaging_parachains_runtime_api_impl::candidates_pending_availability::<Runtime>(para_id)
+		}
 	}
 
 	impl beefy_primitives::BeefyApi<Block, BeefyId> for Runtime {
 		fn beefy_genesis() -> Option<BlockNumber> {
-			Beefy::genesis_block()
+			pallet_beefy::GenesisBlock::<Runtime>::get()
 		}
 
 		fn validator_set() -> Option<beefy_primitives::ValidatorSet<BeefyId>> {
@@ -2427,12 +2482,16 @@ sp_api::impl_runtime_apis! {
 	}
 
 	impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
-		fn create_default_config() -> Vec<u8> {
-			create_default_config::<RuntimeGenesisConfig>()
+		fn build_state(config: Vec<u8>) -> sp_genesis_builder::Result {
+			build_state::<RuntimeGenesisConfig>(config)
 		}
 
-		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
-			build_config::<RuntimeGenesisConfig>(config)
+		fn get_preset(id: &Option<sp_genesis_builder::PresetId>) -> Option<Vec<u8>> {
+			get_preset::<RuntimeGenesisConfig>(id, |_| None)
+		}
+
+		fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
+			vec![]
 		}
 	}
 
