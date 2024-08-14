@@ -255,7 +255,7 @@ pub mod pallet {
 		pub fn burn(from: &Address, amount: u128) -> DispatchResult {
 			ensure!(from != &Address::zero(), <Error<T>>::ERC20InvalidSender);
 
-			Self::burn_from(from, amount.into(), Precision::Exact, Fortitude::Polite)
+			Self::burn_from(from, amount.into(), Preservation::Protect, Precision::Exact, Fortitude::Polite)
 				.map_err(Self::map_substrate_error)?;
 
 			Ok(())

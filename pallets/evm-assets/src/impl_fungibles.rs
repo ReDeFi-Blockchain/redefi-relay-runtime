@@ -118,6 +118,7 @@ impl<T: Config> fungibles::Mutate<Address> for Pallet<T> {
 		asset: Self::AssetId,
 		who: &Address,
 		amount: Self::Balance,
+		preservation: Preservation,
 		precision: frame_support::traits::tokens::Precision,
 		force: frame_support::traits::tokens::Fortitude,
 	) -> Result<Self::Balance, DispatchError> {
@@ -127,7 +128,7 @@ impl<T: Config> fungibles::Mutate<Address> for Pallet<T> {
 			amount,
 			precision,
 			/* No dust support - account should live */
-			Preservation::Protect,
+			preservation,
 			force,
 		)
 	}
