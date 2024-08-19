@@ -32,7 +32,7 @@ use pallet_evm::{
 	ExitError, ExitRevert, ExitSucceed, GasWeightMapping, PrecompileFailure, PrecompileHandle,
 	PrecompileOutput, PrecompileResult,
 };
-use parity_scale_codec::Decode;
+use codec::Decode;
 use sp_core::{Get, H160};
 use sp_std::{cell::RefCell, vec::Vec};
 use sp_weights::Weight;

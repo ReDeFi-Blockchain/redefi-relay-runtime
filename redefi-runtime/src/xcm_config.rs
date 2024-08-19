@@ -28,8 +28,8 @@ use polkadot_runtime_constants::{
 	system_parachain::*,
 	xcm::body::FELLOWSHIP_ADMIN_INDEX,
 };
-use runtime_common::xcm_sender::{ChildParachainRouter, NoPriceForMessageDelivery};
-use runtime_parachains::FeeTracker;
+use polkadot_runtime_common::xcm_sender::{ChildParachainRouter, NoPriceForMessageDelivery};
+use polkadot_runtime_parachains::FeeTracker;
 use sp_core::ConstU32;
 use xcm::latest::{prelude::*, Fungibility};
 use xcm_builder::{

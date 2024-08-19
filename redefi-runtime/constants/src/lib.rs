@@ -16,6 +16,8 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use frame_support::weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight};
+
 pub mod weights;
 
 pub use self::currency::DOLLARS;
@@ -24,7 +26,7 @@ pub const TOKEN_SYMBOL: &str = "BAX";
 
 /// Money matters.
 pub mod currency {
-	use primitives::Balance;
+	use polkadot_primitives::Balance;
 
 	/// The existential deposit.
 	pub const EXISTENTIAL_DEPOSIT: Balance = 100 * CENTS;
@@ -42,8 +44,8 @@ pub mod currency {
 
 /// Time and blocks.
 pub mod time {
-	use primitives::{BlockNumber, Moment};
-	use runtime_common::prod_or_fast;
+	use polkadot_primitives::{BlockNumber, Moment};
+	use polkadot_runtime_common::prod_or_fast;
 	pub const MILLISECS_PER_BLOCK: Moment = 6000;
 	pub const SLOT_DURATION: Moment = MILLISECS_PER_BLOCK;
 	pub const EPOCH_DURATION_IN_SLOTS: BlockNumber = prod_or_fast!(4 * HOURS, 1 * MINUTES);
@@ -66,7 +68,7 @@ pub mod fee {
 	use frame_support::weights::{
 		WeightToFeeCoefficient, WeightToFeeCoefficients, WeightToFeePolynomial,
 	};
-	use primitives::Balance;
+	use polkadot_primitives::Balance;
 	use smallvec::smallvec;
 	pub use sp_runtime::Perbill;
 
@@ -146,10 +148,16 @@ pub mod system_parachain {
 /// Polkadot Treasury pallet instance.
 pub const TREASURY_PALLET_ID: u8 = 19;
 
+/// We allow for 2 seconds of compute with a 6 second average block.
+pub const MAXIMUM_BLOCK_WEIGHT: Weight = Weight::from_parts(
+    WEIGHT_REF_TIME_PER_SECOND.saturating_mul(2),
+    cumulus_primitives_core::relay_chain::MAX_POV_SIZE as u64,
+);
+
 #[cfg(test)]
 mod tests {
 	use frame_support::weights::WeightToFee as WeightToFeeT;
-	use runtime_common::MAXIMUM_BLOCK_WEIGHT;
+	use polkadot_runtime_common::MAXIMUM_BLOCK_WEIGHT;
 
 	use super::{
 		currency::{CENTS, DOLLARS, MILLICENTS},

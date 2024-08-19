@@ -12,9 +12,11 @@ version = "0.1.0"
 [dependencies]
 smallvec = { workspace = true }
 
+
+cumulus-primitives-core = { workspace = true }
 frame-support = { workspace = true }
-primitives = { workspace = true }
-runtime-common = { workspace = true }
+polkadot-primitives = { workspace = true }
+polkadot-runtime-common = { workspace = true }
 sp-runtime = { workspace = true }
 sp-weights = { workspace = true }
 sp-core = { workspace = true }
@@ -26,9 +28,10 @@ xcm-builder = { workspace = true }
 default = ["std"]
 testnet-id = []
 std = [
+	"cumulus-primitives-core/std",
 	"frame-support/std",
-	"primitives/std",
-	"runtime-common/std",
+	"polkadot-primitives/std",
+	"polkadot-runtime-common/std",
 	"sp-core/std",
 	"sp-runtime/std",
 	"sp-weights/std",
