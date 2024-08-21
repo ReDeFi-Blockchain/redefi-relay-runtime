@@ -43,8 +43,9 @@ serde_derive = "1.0.117"
 static_assertions = "1.1.0"
 smallvec = "1.8.0"
 
-cumulus-primitives-aura = { default-features = false, version = "0.14.0" }
 cumulus-primitives-core = { default-features = false, version = "0.14.0" }
+# cumulus-pallet-xcmp-queue = { default-features = false, version = "0.15.0" }
+# cumulus-pallet-parachain-system = { default-features = false, version = "0.15.0" }
 
 sp-authority-discovery = { default-features = false, version = "33.0.0" }
 sp-consensus-babe = { default-features = false, version = "0.39.0" }

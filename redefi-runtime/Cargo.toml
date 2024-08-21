@@ -26,8 +26,9 @@ serde_derive = { version = "1.0.117", optional = true }
 static_assertions = "1.1.0"
 smallvec = "1.8.0"
 
-cumulus-primitives-aura = { workspace = true }
-
+# cumulus-pallet-xcmp-queue = { workspace = true }
+# cumulus-pallet-parachain-system = { workspace = true }
+cumulus-primitives-core = { workspace = true }
 sp-authority-discovery = { workspace = true }
 sp-consensus-babe = { workspace = true }
 sp-consensus-beefy = { workspace = true }
@@ -158,7 +159,6 @@ default = ["std"]
 no_std = []
 only-staking = []
 std = [
-	"cumulus-primitives-aura/std",
 	"sp-authority-discovery/std",
 	"sp-consensus-babe/std",
 	"sp-consensus-beefy/std",
@@ -166,6 +166,9 @@ std = [
 	"bitvec/std",
 	"sp-block-builder/std",
 	"codec/std",
+	# "cumulus-pallet-xcmp-queue/std",
+	# "cumulus-pallet-parachain-system/std",
+	"cumulus-primitives-core/std",
 	"frame-benchmarking?/std",
 	"frame-election-provider-support/std",
 	"frame-executive/std",
@@ -261,6 +264,9 @@ std = [
 	"pallet-evm-coder-substrate/std",
 ]
 runtime-benchmarks = [
+	# "cumulus-pallet-xcmp-queue/runtime-benchmarks",
+	# "cumulus-pallet-parachain-system/runtime-benchmarks",
+	"cumulus-primitives-core/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-election-provider-support/runtime-benchmarks",
 	"frame-support/runtime-benchmarks",
@@ -316,6 +322,8 @@ runtime-benchmarks = [
 	"pallet-ethereum/runtime-benchmarks",
 ]
 try-runtime = [
+	# "cumulus-pallet-xcmp-queue/try-runtime",
+	# "cumulus-pallet-parachain-system/try-runtime",
 	"frame-election-provider-support/try-runtime",
 	"frame-executive/try-runtime",
 	"frame-support/try-runtime",

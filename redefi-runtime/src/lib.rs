@@ -150,23 +150,6 @@ impl_runtime_weights!(polkadot_runtime_constants);
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-/// Maximum number of blocks simultaneously accepted by the Runtime, not yet included
-/// into the relay chain.
-const UNINCLUDED_SEGMENT_CAPACITY: u32 = 3;
-/// How many parachain blocks are processed by the relay chain per parent. Limits the
-/// number of blocks authored per slot.
-const BLOCK_PROCESSING_VELOCITY: u32 = 1;
-/// Relay chain slot duration, in milliseconds.
-const RELAY_CHAIN_SLOT_DURATION_MILLIS: u32 = 6000;
-
-/// Aura consensus hook
-type ConsensusHook = cumulus_pallet_aura_ext::FixedVelocityConsensusHook<
-	Runtime,
-	RELAY_CHAIN_SLOT_DURATION_MILLIS,
-	BLOCK_PROCESSING_VELOCITY,
-	UNINCLUDED_SEGMENT_CAPACITY,
->;
-
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
@@ -450,7 +433,7 @@ impl pallet_transaction_payment::Config for Runtime {
 }
 
 parameter_types! {
-	pub const MinimumPeriod: u64 = ConstU64<0>;;
+	pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
 impl pallet_timestamp::Config for Runtime {
 	type Moment = u64;
@@ -486,14 +469,6 @@ impl pallet_session::Config for Runtime {
 	type SessionHandler = <SessionKeys as OpaqueKeys>::KeyTypeIdProviders;
 	type Keys = SessionKeys;
 	type WeightInfo = weights::pallet_session::WeightInfo<Runtime>;
-}
-
-impl pallet_aura::Config for Runtime {
-	type AuthorityId = AuraId;
-	type DisabledValidators = ();
-	type MaxAuthorities = ConstU32<100_000>;
-    type AllowMultipleBlocksPerSlot = ConstBool<true>;
-	type SlotDuration = ConstU64<SLOT_DURATION>;
 }
 
 impl pallet_session::historical::Config for Runtime {
@@ -1589,22 +1564,37 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
 	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
-	pub const RelayOrigin: AggregateMessageOrigin = AggregateMessageOrigin::Parent;
+	pub const RelayOrigin: cumulus_primitives_core::AggregateMessageOrigin = cumulus_primitives_core::AggregateMessageOrigin::Parent;
 }
 
-impl cumulus_pallet_parachain_system::Config for Runtime {
-	type WeightInfo = ();
-	type RuntimeEvent = RuntimeEvent;
-	type OnSystemEvent = ();
-	type SelfParaId = parachain_info::Pallet<Runtime>;
-	type OutboundXcmpMessageSource = XcmpQueue;
-	type DmpQueue = frame_support::traits::EnqueueWithOrigin<MessageQueue, RelayOrigin>;
-	type ReservedDmpWeight = ReservedDmpWeight;
-	type XcmpMessageHandler = XcmpQueue;
-	type ReservedXcmpWeight = ReservedXcmpWeight;
-	type CheckAssociatedRelayNumber = RelayNumberMonotonicallyIncreases;
-	type ConsensusHook = ConsensusHook;
-}
+// impl cumulus_pallet_parachain_system::Config for Runtime {
+// 	type WeightInfo = ();
+// 	type RuntimeEvent = RuntimeEvent;
+// 	type OnSystemEvent = ();
+// 	type SelfParaId = parachain_info::Pallet<Runtime>;
+// 	type OutboundXcmpMessageSource = XcmpQueue;
+// 	type DmpQueue = frame_support::traits::EnqueueWithOrigin<MessageQueue, RelayOrigin>;
+// 	type ReservedDmpWeight = ReservedDmpWeight;
+// 	type XcmpMessageHandler = XcmpQueue;
+// 	type ReservedXcmpWeight = ReservedXcmpWeight;
+// 	type CheckAssociatedRelayNumber = RelayNumberMonotonicallyIncreases;
+// 	type ConsensusHook = cumulus_pallet_parachain_system::consensus_hook::ExpectParentIncluded;
+// }
+
+// impl cumulus_pallet_xcmp_queue::Config for Runtime {
+// 	type RuntimeEvent = RuntimeEvent;
+// 	type ChannelInfo = ParachainSystem;
+// 	type VersionWrapper = ();
+// 	// Enqueue XCMP messages from siblings for later processing.
+// 	type XcmpQueue = TransformOrigin<MessageQueue, AggregateMessageOrigin, ParaId, ParaIdToSibling>;
+// 	type MaxInboundSuspended = sp_core::ConstU32<1_000>;
+// 	type MaxActiveOutboundChannels = ConstU32<128>;
+// 	type MaxPageSize = ConstU32<{ 1 << 16 }>;
+// 	type ControllerOrigin = EnsureRoot<AccountId>;
+// 	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
+// 	type WeightInfo = ();
+// 	type PriceForSiblingDelivery = NoPriceForMessageDelivery<ParaId>;
+// }
 
 construct_runtime! {
 	pub enum Runtime
@@ -1717,6 +1707,9 @@ construct_runtime! {
 		BalancesAdapter: pallet_balances_adapter = 106,
 		EvmAssets: pallet_evm_assets = 107,
 		EvmTransactionPayment: pallet_evm_transaction_payment = 110,
+
+		// XCM helpers.
+		// XcmpQueue: cumulus_pallet_xcmp_queue::{Pallet, Call, Storage, Event<T>} = 111,
 
 		// BEEFY Bridges support.
 		Beefy: pallet_beefy = 200,
@@ -1847,25 +1840,6 @@ mod benches {
 }
 
 sp_api::impl_runtime_apis! {
-	impl sp_consensus_aura::AuraApi<Block, AuraId> for Runtime {
-		fn slot_duration() -> sp_consensus_aura::SlotDuration {
-			sp_consensus_aura::SlotDuration::from_millis(SLOT_DURATION)
-		}
-
-		fn authorities() -> Vec<AuraId> {
-			Authorities::<Runtime>::get().into_inner()
-		}
-	}
-
-	impl cumulus_primitives_aura::AuraUnincludedSegmentApi<Block> for Runtime {
-		fn can_build_upon(
-			included_hash: <Block as BlockT>::Hash,
-			slot: cumulus_primitives_aura::Slot,
-		) -> bool {
-			ConsensusHook::can_build_upon(included_hash, slot)
-		}
-	}
-
 	impl sp_api::Core<Block> for Runtime {
 		fn version() -> RuntimeVersion {
 			VERSION
@@ -2766,11 +2740,6 @@ sp_api::impl_runtime_apis! {
 			Ok(batches)
 		}
 	}
-}
-
-cumulus_pallet_parachain_system::register_validate_block! {
-	Runtime = Runtime,
-	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
 }
 
 #[cfg(test)]
