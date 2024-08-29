@@ -262,6 +262,8 @@ std = [
 	"pallet-balances-adapter/std",
 	"pallet-evm-assets/std",
 	"pallet-evm-coder-substrate/std",
+	"pallet-evm-transaction-payment/std",
+	"fp-self-contained/std",
 ]
 runtime-benchmarks = [
 	# "cumulus-pallet-xcmp-queue/runtime-benchmarks",
@@ -376,6 +378,11 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 	"pallet-evm/try-runtime",
 	"pallet-ethereum/try-runtime",
+	"fp-self-contained/try-runtime",
+	"pallet-balances-adapter/try-runtime",
+    "pallet-evm-assets/try-runtime",
+    "pallet-evm-coder-substrate/try-runtime",
+    "pallet-evm-transaction-payment/try-runtime",
 ]
 
 # A feature that should be enabled when the runtime should be build for on-chain
