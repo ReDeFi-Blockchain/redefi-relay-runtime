@@ -155,7 +155,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_033,
+	spec_version: 1_003_0_034,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,
