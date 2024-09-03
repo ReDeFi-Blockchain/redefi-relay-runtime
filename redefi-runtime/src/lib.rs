@@ -155,7 +155,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 	spec_name: create_runtime_str!("redefi"),
 	impl_name: create_runtime_str!("redefi"),
 	authoring_version: 0,
-	spec_version: 1_003_0_034,
+	spec_version: 1_003_0_035,
 	impl_version: 0,
 	apis: RUNTIME_API_VERSIONS,
 	transaction_version: 0,
@@ -1762,9 +1762,82 @@ pub type Migrations = migrations::Unreleased;
 pub mod migrations {
 
 	use crate::*;
+	use frame_support::traits::GetStorageVersion;
+
+	const IDENTITY_MIGRATION_KEY_LIMIT: u64 = u64::MAX;
+
+	//original migration from pallet_staking has bug and can't update pallet that has version greater than 14
+	pub struct MigrateStakingToV14<T>(core::marker::PhantomData<T>);
+	impl<T: pallet_staking::Config> frame_support::traits::OnRuntimeUpgrade for MigrateStakingToV14<T> {
+		fn on_runtime_upgrade() -> Weight {
+			let in_code = pallet_staking::Pallet::<T>::in_code_storage_version();
+			let on_chain = pallet_staking::Pallet::<T>::on_chain_storage_version();
+
+			if in_code >= 14 && on_chain == 13 {
+				frame_support::traits::StorageVersion::new(14).put::<pallet_staking::Pallet<T>>();
+
+				//log!(info, "staking v14 applied successfully.");
+				T::DbWeight::get().reads_writes(1, 1)
+			} else {
+				//log!(warn, "staking v14 not applied.");
+				T::DbWeight::get().reads(1)
+			}
+		}
+
+		#[cfg(feature = "try-runtime")]
+		fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
+			frame_support::ensure!(
+				pallet_staking::Pallet::<T>::on_chain_storage_version() >= 14,
+				"v14 not applied"
+			);
+			Ok(())
+		}
+	}
+
+	//need to set version 1 to evm-assets because version was set to 0 by default
+	pub struct MigrateEvmAssetsToV1<T>(core::marker::PhantomData<T>);
+	impl<T: pallet_evm_assets::Config> frame_support::traits::OnRuntimeUpgrade for MigrateEvmAssetsToV1<T> {
+		fn on_runtime_upgrade() -> Weight {
+			let in_code = pallet_evm_assets::Pallet::<T>::in_code_storage_version();
+			let on_chain = pallet_evm_assets::Pallet::<T>::on_chain_storage_version();
+
+			if in_code >= 1 && on_chain == 0 {
+				frame_support::traits::StorageVersion::new(1).put::<pallet_evm_assets::Pallet<T>>();
+
+				//log!(info, "staking v14 applied successfully.");
+				T::DbWeight::get().reads_writes(1, 1)
+			} else {
+				//log!(warn, "staking v14 not applied.");
+				T::DbWeight::get().reads(1)
+			}
+		}
+
+		#[cfg(feature = "try-runtime")]
+		fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
+			frame_support::ensure!(
+				pallet_evm_assets::Pallet::<T>::on_chain_storage_version() >= 1,
+				"v14 not applied"
+			);
+			Ok(())
+		}
+	}
 
 	/// Unreleased migrations. Add new ones here:
-	pub type Unreleased = ();
+	pub type Unreleased = (
+		pallet_grandpa::migrations::CleanupSetIdSessionMap<Runtime>,
+		pallet_grandpa::migrations::MigrateV4ToV5<Runtime>,
+		MigrateStakingToV14<Runtime>,
+		pallet_staking::migrations::v15::MigrateV14ToV15<Runtime>,
+		pallet_identity::migration::versioned::V0ToV1<Runtime, IDENTITY_MIGRATION_KEY_LIMIT>,
+		pallet_nomination_pools::migration::versioned::V7ToV8<Runtime>,
+		polkadot_runtime_parachains::configuration::migration::v10::MigrateToV10<Runtime>,
+		polkadot_runtime_parachains::configuration::migration::v11::MigrateToV11<Runtime>,
+		polkadot_runtime_parachains::configuration::migration::v12::MigrateToV12<Runtime>,
+		polkadot_runtime_parachains::inclusion::migration::MigrateToV1<Runtime>,
+		polkadot_runtime_parachains::scheduler::migration::MigrateV1ToV2<Runtime>,
+		MigrateEvmAssetsToV1<Runtime>,
+		pallet_xcm::migration::MigrateToLatestXcmVersion<Runtime>,
+	);
 }
 
 /// Unchecked extrinsic type as expected by this runtime (Frontier wrapped extr).
